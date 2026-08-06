@@ -1,6 +1,6 @@
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://desktop-hong-home.tail5a779f.ts.net',
+  defaultValue: 'https://food-ai-app-332i.onrender.com',
 );
 
 class ApiConfig {

@@ -19,7 +19,16 @@ class BackendSettings extends ChangeNotifier {
     if (savedValue == null) return;
 
     try {
-      _baseUrl = ApiConfig.normalizeBaseUrl(savedValue);
+      final normalized = ApiConfig.normalizeBaseUrl(savedValue);
+      final host = Uri.parse(normalized).host.toLowerCase();
+      final isLegacyTunnel =
+          host.endsWith('.trycloudflare.com') || host.endsWith('.ts.net');
+      if (isLegacyTunnel) {
+        await preferences.remove(_storageKey);
+        _baseUrl = ApiConfig.defaultBaseUrl;
+      } else {
+        _baseUrl = normalized;
+      }
     } on FormatException {
       await preferences.remove(_storageKey);
       _baseUrl = ApiConfig.defaultBaseUrl;

@@ -6,7 +6,7 @@
       "request": "launch",
       "type": "dart",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=https://desktop-hong-home.tail5a779f.ts.net"
+        "--dart-define=API_BASE_URL=https://food-ai-app-332i.onrender.com"
       ]
     }
   ]

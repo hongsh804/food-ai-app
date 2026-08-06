@@ -12,7 +12,7 @@ class AiApiService {
   const AiApiService._();
 
   static const AiApiService instance = AiApiService._();
-  static const Duration _timeout = Duration(seconds: 45);
+  static const Duration _timeout = Duration(seconds: 120);
   static const int _maxImageBytes = 8 * 1024 * 1024;
 
   String get currentBaseUrl => BackendSettings.instance.baseUrl;

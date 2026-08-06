@@ -245,8 +245,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   autocorrect: false,
                   enableSuggestions: false,
                   decoration: const InputDecoration(
-                    labelText: 'Cloudflare Tunnel 주소',
-                    hintText: 'https://desktop-hong-home.tail5a779f.ts.net',
+                    labelText: '백엔드 서버 주소',
+                    hintText: 'https://food-ai-app-332i.onrender.com',
                     prefixIcon: Icon(Icons.link_rounded),
                   ),
                 ),

@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:food_ai_app/config/api_config.dart';
 
 void main() {
+  test('uses the deployed Render service by default', () {
+    expect(ApiConfig.defaultBaseUrl, 'https://food-ai-app-332i.onrender.com');
+  });
+
   group('ApiConfig.buildUri', () {
     test('removes a trailing slash and a leading path slash', () {
       final uri = ApiConfig.buildUri('https://example.com/', '/health');
