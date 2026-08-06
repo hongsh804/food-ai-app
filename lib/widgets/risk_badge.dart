@@ -1,0 +1,72 @@
+import 'package:flutter/material.dart';
+
+import '../models/meal_analysis.dart';
+import 'app_colors.dart';
+
+class RiskBadge extends StatelessWidget {
+  const RiskBadge({
+    super.key,
+    required this.risk,
+    required this.estimatedRise,
+    this.compact = false,
+  });
+
+  final GlucoseRisk risk;
+  final int estimatedRise;
+  final bool compact;
+
+  Color get _color {
+    switch (risk) {
+      case GlucoseRisk.low:
+        return AppColors.low;
+      case GlucoseRisk.medium:
+        return AppColors.medium;
+      case GlucoseRisk.high:
+        return AppColors.high;
+    }
+  }
+
+  Color get _backgroundColor {
+    if (risk == GlucoseRisk.low) return AppColors.lowSoft;
+    return _color.withValues(alpha: 0.12);
+  }
+
+  Color get _borderColor {
+    if (risk == GlucoseRisk.low) return AppColors.lowBorder;
+    return _color.withValues(alpha: 0.22);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 14,
+        vertical: compact ? 6 : 9,
+      ),
+      decoration: BoxDecoration(
+        color: _backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.water_drop_rounded,
+            size: compact ? 14 : 18,
+            color: _color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '혈당 +$estimatedRise mg/dL',
+            style: TextStyle(
+              color: _color,
+              fontSize: compact ? 12 : 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

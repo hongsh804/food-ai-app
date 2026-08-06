@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "식후당 (Android Emulator)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=https://desktop-hong-home.tail5a779f.ts.net"
+      ]
+    }
+  ]
+}
