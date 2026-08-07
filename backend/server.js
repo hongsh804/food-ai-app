@@ -2,7 +2,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import multer from 'multer';
+import { pathToFileURL } from 'node:url';
 import { GoogleGenAI, Type } from '@google/genai';
+import {
+  CalibrationStore,
+  addNoCalibration,
+  applyCalibration,
+} from './calibration_store.js';
 
 dotenv.config();
 
@@ -14,18 +20,26 @@ const GEMINI_API_KEY =
   rawGeminiApiKey === '내_Gemini_API_키' ? '' : rawGeminiApiKey;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const calibrationStore = new CalibrationStore();
 
-const app = express();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_BODY_BYTES },
-});
+export function createApp({
+  aiClient = ai,
+  calibrationRepository = calibrationStore,
+  identifyFoodHandler = identifyFood,
+  analyzeMealHandler = analyzeMeal,
+  geminiModel = GEMINI_MODEL,
+} = {}) {
+  const app = express();
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_BODY_BYTES },
+  });
 
-app.use(cors());
-app.use(express.json({ limit: `${MAX_BODY_BYTES}b` }));
+  app.use(cors());
+  app.use(express.json({ limit: `${MAX_BODY_BYTES}b` }));
 
-app.get('/', (req, res) => {
-  res.type('html').send(`<!doctype html>
+  app.get('/', (req, res) => {
+    res.type('html').send(`<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="utf-8">
@@ -81,77 +95,157 @@ app.get('/', (req, res) => {
     </main>
   </body>
 </html>`);
-});
-
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    provider: 'gemini',
-    model: GEMINI_MODEL,
-    hasGeminiKey: Boolean(GEMINI_API_KEY),
   });
-});
 
-app.post('/api/identify-food', upload.none(), async (req, res) => {
-  if (!GEMINI_API_KEY || !ai) {
-    res.json({ candidates: mockCandidates(), source: 'mock' });
-    return;
-  }
-
-  try {
-    const result = await identifyFood(req.body);
-    res.json({ ...result, source: 'gemini' });
-  } catch (error) {
-    console.error('Gemini identify fallback:', error);
-    res.json({ candidates: mockCandidates(), source: 'mock' });
-  }
-});
-
-app.post('/api/analyze-meal', upload.none(), async (req, res) => {
-  const foodName = String(req.body.foodName || '').trim();
-
-  if (!foodName) {
-    res.status(400).json({ error: 'foodName is required' });
-    return;
-  }
-
-  if (!GEMINI_API_KEY || !ai) {
-    res.json({ ...mockAnalysis(foodName), source: 'mock' });
-    return;
-  }
-
-  try {
-    const result = await analyzeMeal(req.body);
-    res.json({ ...result, source: 'gemini' });
-  } catch (error) {
-    console.error('Gemini analysis fallback:', error);
-    res.json({ ...mockAnalysis(foodName), source: 'mock' });
-  }
-});
-
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
-app.use((error, req, res, next) => {
-  console.error(error);
-  res.status(500).json({
-    error: 'Server error',
-    detail: error instanceof Error ? error.message : String(error),
+  app.get('/health', (req, res) => {
+    res.json({
+      ok: true,
+      provider: 'gemini',
+      model: geminiModel,
+      hasGeminiKey: Boolean(aiClient),
+    });
   });
-});
 
-app.listen(PORT, HOST, () => {
-  const displayHost = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
-  console.log(
-    `GlucoLog Gemini API server listening on http://${displayHost}:${PORT}`,
-  );
-  console.log(
-    GEMINI_API_KEY
-      ? `Gemini model: ${GEMINI_MODEL}`
-      : 'GEMINI_API_KEY is missing. Server will return mock responses.',
-  );
-});
+  app.get('/api/calibrations/catalog', async (req, res) => {
+    const profiles = await calibrationRepository.getCatalog();
+    res.json({ profiles });
+  });
+
+  app.post('/api/identify-food', upload.none(), async (req, res) => {
+    const [profiles, suggestedProfileId] = await Promise.all([
+      calibrationRepository.getCatalog(),
+      calibrationRepository.findSuggestedProfileId(req.body.imageBase64),
+    ]);
+    const calibrationContext = { profiles, suggestedProfileId };
+
+    if (!aiClient) {
+      res.json({
+        candidates: mockCandidates(),
+        source: 'mock',
+        ...calibrationContext,
+      });
+      return;
+    }
+
+    try {
+      const result = await identifyFoodHandler(req.body);
+      res.json({ ...result, source: 'gemini', ...calibrationContext });
+    } catch (error) {
+      console.error('Gemini identify fallback:', error);
+      res.json({
+        candidates: mockCandidates(),
+        source: 'mock',
+        ...calibrationContext,
+      });
+    }
+  });
+
+  app.post('/api/analyze-meal', upload.none(), async (req, res) => {
+    const foodName = String(req.body.foodName || '').trim();
+    const calibrationProfileId = String(
+      req.body.calibrationProfileId || '',
+    ).trim();
+
+    if (!foodName) {
+      res.status(400).json({ error: 'foodName is required' });
+      return;
+    }
+
+    if (!aiClient) {
+      res.json({
+        ...addNoCalibration(
+          mockAnalysis(foodName),
+          calibrationProfileId
+            ? 'Gemini 응답이 없어 요청한 보정 프로필을 적용하지 않았습니다.'
+            : '',
+        ),
+        source: 'mock',
+      });
+      return;
+    }
+
+    try {
+      const result = await analyzeMealHandler(req.body);
+      const calibratedResult = await resolveCalibration({
+        analysis: result,
+        foodName,
+        calibrationProfileId,
+        calibrationRepository,
+      });
+      res.json({ ...calibratedResult, source: 'gemini' });
+    } catch (error) {
+      console.error('Gemini analysis fallback:', error);
+      res.json({
+        ...addNoCalibration(
+          mockAnalysis(foodName),
+          calibrationProfileId
+            ? 'Gemini 처리 실패로 요청한 보정 프로필을 적용하지 않았습니다.'
+            : '',
+        ),
+        source: 'mock',
+      });
+    }
+  });
+
+  app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  app.use((error, req, res, next) => {
+    console.error(error);
+    res.status(500).json({
+      error: 'Server error',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  return app;
+}
+
+export async function resolveCalibration({
+  analysis,
+  foodName,
+  calibrationProfileId,
+  calibrationRepository,
+}) {
+  if (calibrationProfileId) {
+    const profile = await calibrationRepository.getActiveProfile(
+      calibrationProfileId,
+    );
+    return profile
+      ? applyCalibration(analysis, profile)
+      : addNoCalibration(
+          analysis,
+          '요청한 보정 프로필이 없거나 비활성 상태입니다.',
+        );
+  }
+
+  const menuRule = await calibrationRepository.findMenuRule(foodName);
+  return menuRule
+    ? applyCalibration(analysis, menuRule, { matchType: 'menu' })
+    : addNoCalibration(analysis);
+}
+
+export function startServer(app = createApp()) {
+  return app.listen(PORT, HOST, () => {
+    const displayHost = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
+    console.log(
+      `GlucoLog Gemini API server listening on http://${displayHost}:${PORT}`,
+    );
+    console.log(
+      GEMINI_API_KEY
+        ? `Gemini model: ${GEMINI_MODEL}`
+        : 'GEMINI_API_KEY is missing. Server will return mock responses.',
+    );
+  });
+}
+
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
+  startServer();
+}
 
 async function identifyFood(body) {
   const responseJson = await callGeminiJson({

@@ -95,6 +95,13 @@ class ResultScreen extends StatelessWidget {
             ],
             const SizedBox(height: 18),
             _PredictionCard(analysis: analysis),
+            if (analysis.calibration?.applied == true) ...[
+              const SizedBox(height: 14),
+              _CalibrationCard(calibration: analysis.calibration!),
+            ] else if (analysis.calibration?.note.isNotEmpty == true) ...[
+              const SizedBox(height: 14),
+              _CalibrationWarningCard(calibration: analysis.calibration!),
+            ],
             const SizedBox(height: 14),
             _NutritionCard(analysis: analysis),
             const SizedBox(height: 14),
@@ -298,6 +305,186 @@ class _PredictionCard extends StatelessWidget {
               fontSize: 12,
               height: 1.55,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalibrationCard extends StatelessWidget {
+  const _CalibrationCard({required this.calibration});
+
+  final MealCalibration calibration;
+
+  @override
+  Widget build(BuildContext context) {
+    final ruleName = calibration.ruleName.isEmpty
+        ? '등록된 보정 규칙'
+        : calibration.ruleName;
+
+    return AppCard(
+      color: AppColors.lowSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.primaryDark,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  '측정 데이터 보정 적용',
+                  style: TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  '데이터 보정',
+                  style: TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            ruleName,
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'AI 원본 '),
+                  TextSpan(
+                    text: '+${calibration.rawEstimatedGlucoseRise}',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const TextSpan(text: '  →  보정 '),
+                  TextSpan(
+                    text: '+${calibration.adjustedEstimatedGlucoseRise}',
+                    style: const TextStyle(
+                      color: AppColors.primaryDark,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const TextSpan(text: ' mg/dL'),
+                ],
+              ),
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (calibration.sampleCount > 0) ...[
+            const SizedBox(height: 9),
+            Text(
+              '등록된 실측 표본 ${calibration.sampleCount}건을 참고했습니다.',
+              style: const TextStyle(
+                color: AppColors.primaryDark,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (calibration.note.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              calibration.note,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 10,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CalibrationWarningCard extends StatelessWidget {
+  const _CalibrationWarningCard({required this.calibration});
+
+  final MealCalibration calibration;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: const Color(0xFFFFF4E5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFC06B00)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '선택한 보정이 적용되지 않았어요',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  calibration.note,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    height: 1.45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

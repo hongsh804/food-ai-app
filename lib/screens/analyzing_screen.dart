@@ -15,11 +15,13 @@ class AnalyzingScreen extends StatefulWidget {
     this.imageBytes,
     this.imageSourceLabel,
     this.confirmedFoodName,
+    this.calibrationProfileId,
   });
 
   final Uint8List? imageBytes;
   final String? imageSourceLabel;
   final String? confirmedFoodName;
+  final String? calibrationProfileId;
 
   @override
   State<AnalyzingScreen> createState() => _AnalyzingScreenState();
@@ -60,7 +62,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
   Future<void> _moveToFoodIdentification() async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 850));
-      final candidates = await AiApiService.instance.identifyFoodCandidates(
+      final identification = await AiApiService.instance.identifyFoodCandidates(
         widget.imageBytes,
       );
       if (!mounted) return;
@@ -72,7 +74,9 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
           builder: (_) => FoodIdentificationScreen(
             imageBytes: widget.imageBytes,
             imageSourceLabel: widget.imageSourceLabel,
-            candidates: candidates,
+            candidates: identification.candidates,
+            profiles: identification.profiles,
+            suggestedProfileId: identification.suggestedProfileId,
           ),
         ),
       );
@@ -89,6 +93,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
       final analysis = await AiApiService.instance.analyzeMeal(
         foodName: widget.confirmedFoodName ?? '',
         imageBytes: widget.imageBytes,
+        calibrationProfileId: widget.calibrationProfileId,
       );
       final record = await MealHistoryStore.instance.addAnalysis(analysis);
       if (!mounted) return;

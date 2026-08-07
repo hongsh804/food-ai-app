@@ -39,6 +39,69 @@ class IngredientEstimate {
   }
 }
 
+class MealCalibration {
+  const MealCalibration({
+    required this.applied,
+    required this.ruleId,
+    required this.ruleName,
+    required this.matchType,
+    required this.mode,
+    required this.rawEstimatedGlucoseRise,
+    required this.adjustedEstimatedGlucoseRise,
+    required this.sampleCount,
+    required this.note,
+  });
+
+  final bool applied;
+  final String ruleId;
+  final String ruleName;
+  final String matchType;
+  final String mode;
+  final int rawEstimatedGlucoseRise;
+  final int adjustedEstimatedGlucoseRise;
+  final int sampleCount;
+  final String note;
+
+  factory MealCalibration.fromJson(Map<String, dynamic> json) {
+    final rawRise = _intFromJson(json['rawEstimatedGlucoseRise']);
+    return MealCalibration(
+      applied: json['applied'] == true,
+      ruleId: (json['ruleId'] as String? ?? '').trim(),
+      ruleName: (json['ruleName'] as String? ?? '').trim(),
+      matchType: (json['matchType'] as String? ?? '').trim(),
+      mode: (json['mode'] as String? ?? '').trim(),
+      rawEstimatedGlucoseRise: rawRise,
+      adjustedEstimatedGlucoseRise: _intFromJson(
+        json['adjustedEstimatedGlucoseRise'],
+        fallback: rawRise,
+      ),
+      sampleCount: _intFromJson(json['sampleCount']),
+      note: (json['note'] as String? ?? '').trim(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'applied': applied,
+      'ruleId': ruleId,
+      'ruleName': ruleName,
+      'matchType': matchType,
+      'mode': mode,
+      'rawEstimatedGlucoseRise': rawEstimatedGlucoseRise,
+      'adjustedEstimatedGlucoseRise': adjustedEstimatedGlucoseRise,
+      'sampleCount': sampleCount,
+      'note': note,
+    };
+  }
+
+  static int _intFromJson(Object? value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+}
+
 class MealAnalysis {
   const MealAnalysis({
     required this.foodName,
@@ -55,6 +118,7 @@ class MealAnalysis {
     required this.glucoseDescription,
     this.portionDescription = '1인분 기준 추정',
     this.ingredients = const [],
+    this.calibration,
   });
 
   final String foodName;
@@ -71,6 +135,7 @@ class MealAnalysis {
   final String glucoseDescription;
   final String portionDescription;
   final List<IngredientEstimate> ingredients;
+  final MealCalibration? calibration;
 
   factory MealAnalysis.fromJson(Map<String, dynamic> json) {
     final glucoseRisk = GlucoseRisk.fromName(
@@ -103,6 +168,7 @@ class MealAnalysis {
           '사진과 메뉴명을 바탕으로 한 AI 추정값입니다. 실제 조리법과 섭취량에 따라 식후 혈당 상승폭은 달라질 수 있습니다.',
       portionDescription: json['portionDescription'] as String? ?? '1인분 기준 추정',
       ingredients: _ingredientsFromJson(json['ingredients']),
+      calibration: _calibrationFromJson(json['calibration']),
     );
   }
 
@@ -124,6 +190,7 @@ class MealAnalysis {
       'ingredients': [
         for (final ingredient in ingredients) ingredient.toJson(),
       ],
+      if (calibration != null) 'calibration': calibration!.toJson(),
     };
   }
 
@@ -142,6 +209,7 @@ class MealAnalysis {
     String? glucoseDescription,
     String? portionDescription,
     List<IngredientEstimate>? ingredients,
+    MealCalibration? calibration,
   }) {
     return MealAnalysis(
       foodName: foodName ?? this.foodName,
@@ -158,6 +226,7 @@ class MealAnalysis {
       glucoseDescription: glucoseDescription ?? this.glucoseDescription,
       portionDescription: portionDescription ?? this.portionDescription,
       ingredients: ingredients ?? this.ingredients,
+      calibration: calibration ?? this.calibration,
     );
   }
 
@@ -392,5 +461,10 @@ class MealAnalysis {
         )
         .where((ingredient) => ingredient.name.trim().isNotEmpty)
         .toList();
+  }
+
+  static MealCalibration? _calibrationFromJson(Object? value) {
+    if (value is! Map) return null;
+    return MealCalibration.fromJson(Map<String, dynamic>.from(value));
   }
 }

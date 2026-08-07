@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../config/api_config.dart';
+import '../models/food_identification_result.dart';
 import '../models/meal_analysis.dart';
 import 'backend_settings.dart';
 
@@ -33,8 +34,12 @@ class AiApiService {
     );
   }
 
-  Future<List<String>> identifyFoodCandidates(Uint8List? imageBytes) async {
-    if (imageBytes == null || imageBytes.isEmpty) return const [];
+  Future<FoodIdentificationResult> identifyFoodCandidates(
+    Uint8List? imageBytes,
+  ) async {
+    if (imageBytes == null || imageBytes.isEmpty) {
+      return const FoodIdentificationResult();
+    }
     _validateImageSize(imageBytes);
 
     final responseJson = await _postJson('/api/identify-food', {
@@ -51,17 +56,44 @@ class AiApiService {
       );
     }
 
-    return rawCandidates
+    final candidates = rawCandidates
         .whereType<String>()
         .map((candidate) => candidate.trim())
         .where((candidate) => candidate.isNotEmpty)
         .take(5)
         .toList();
+
+    final profiles = <CalibrationProfileSummary>[];
+    final rawProfiles = responseJson['profiles'];
+    if (rawProfiles is List) {
+      for (final rawProfile in rawProfiles.whereType<Map>()) {
+        final profile = CalibrationProfileSummary.fromJson(
+          Map<String, dynamic>.from(rawProfile),
+        );
+        if (profile.id.isNotEmpty && profile.name.isNotEmpty) {
+          profiles.add(profile);
+        }
+      }
+    }
+
+    final rawSuggestedProfileId = responseJson['suggestedProfileId'];
+    final suggestedProfileId =
+        rawSuggestedProfileId is String &&
+            rawSuggestedProfileId.trim().isNotEmpty
+        ? rawSuggestedProfileId.trim()
+        : null;
+
+    return FoodIdentificationResult(
+      candidates: candidates,
+      profiles: profiles,
+      suggestedProfileId: suggestedProfileId,
+    );
   }
 
   Future<MealAnalysis> analyzeMeal({
     required String foodName,
     Uint8List? imageBytes,
+    String? calibrationProfileId,
   }) async {
     if (imageBytes != null && imageBytes.isNotEmpty) {
       _validateImageSize(imageBytes);
@@ -72,6 +104,9 @@ class AiApiService {
       if (imageBytes != null && imageBytes.isNotEmpty)
         'imageBase64': base64Encode(imageBytes),
       if (imageBytes != null && imageBytes.isNotEmpty) 'mimeType': 'image/jpeg',
+      if (calibrationProfileId != null &&
+          calibrationProfileId.trim().isNotEmpty)
+        'calibrationProfileId': calibrationProfileId.trim(),
     });
     _ensureGeminiResponse(responseJson);
 

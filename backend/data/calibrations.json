@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "example-low-sugar-flour",
+      "name": "저당밀가루 예시",
+      "description": "형식 확인용 비활성 템플릿입니다. 실제 측정 자료를 검토한 뒤 active를 true로 변경하세요.",
+      "sampleCount": 0,
+      "mode": "multiplier",
+      "adjustmentValue": 1.0,
+      "scoreOverride": null,
+      "note": "비활성 예시이므로 현재 분석 결과에는 적용되지 않습니다.",
+      "active": false,
+      "approved": false,
+      "version": 1
+    }
+  ],
+  "imageHashes": [],
+  "menuRules": [
+    {
+      "id": "example-gimbap-menu",
+      "name": "김밥",
+      "aliases": ["일반 김밥"],
+      "sampleCount": 0,
+      "mode": "fixed",
+      "adjustmentValue": 80,
+      "scoreOverride": null,
+      "note": "형식 확인용 비활성 메뉴 규칙입니다.",
+      "priority": 0,
+      "active": false,
+      "approved": false,
+      "version": 1
+    }
+  ]
+}
