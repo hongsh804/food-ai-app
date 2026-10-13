@@ -230,7 +230,7 @@ export function sha256ImageBase64(imageBase64) {
 }
 
 export function addNoCalibration(analysis, note = '') {
-  const rawRise = clampInteger(analysis?.estimatedGlucoseRise, 0, 140, 0);
+  const rawScore = clampInteger(analysis?.mealBurdenScore, 0, 100, 0);
   return {
     ...analysis,
     calibration: {
@@ -239,10 +239,10 @@ export function addNoCalibration(analysis, note = '') {
       ruleName: null,
       matchType: 'none',
       mode: null,
-      rawEstimatedGlucoseRise: rawRise,
-      adjustedEstimatedGlucoseRise: rawRise,
+      rawMealBurdenScore: rawScore,
+      adjustedMealBurdenScore: rawScore,
       sampleCount: 0,
-      note: String(note || ''),
+      note: sanitizePublicText(note, '', 200),
     },
   };
 }
@@ -257,57 +257,48 @@ export function applyCalibration(
     return addNoCalibration(analysis);
   }
 
-  const rawRise = clampInteger(analysis?.estimatedGlucoseRise, 0, 140, 0);
-  let adjustedRise;
+  const rawScore = clampInteger(analysis?.mealBurdenScore, 0, 100, 0);
+  let adjustedScore;
   switch (normalizedProfile.mode) {
     case 'fixed':
-      adjustedRise = normalizedProfile.adjustmentValue;
+      adjustedScore = normalizedProfile.adjustmentValue;
       break;
     case 'delta':
-      adjustedRise = rawRise + normalizedProfile.adjustmentValue;
+      adjustedScore = rawScore + normalizedProfile.adjustmentValue;
       break;
     case 'multiplier':
-      adjustedRise = rawRise * normalizedProfile.adjustmentValue;
+      adjustedScore = rawScore * normalizedProfile.adjustmentValue;
       break;
     default:
       return addNoCalibration(analysis);
   }
 
-  adjustedRise = clampInteger(adjustedRise, 0, 140, rawRise);
-  const score = normalizedProfile.scoreOverride ?? clampInteger(
-    adjustedRise * 1.6,
-    0,
-    100,
-    0,
-  );
+  adjustedScore = normalizedProfile.scoreOverride ?? adjustedScore;
+  adjustedScore = clampInteger(adjustedScore, 0, 100, rawScore);
 
   return {
     ...analysis,
-    estimatedGlucoseRise: adjustedRise,
-    glucoseRisk: glucoseRiskFromRise(adjustedRise),
-    glucoseSpikeScore: score,
-    glucoseDescription:
-      `AI 원본 예상 상승폭 +${rawRise} mg/dL에 승인된 측정자료 ` +
-      `${normalizedProfile.sampleCount}건을 적용해 +${adjustedRise} mg/dL로 ` +
-      '보정했습니다. 이 값은 실제 혈당 실측치가 아닌 보정된 예상값입니다.',
+    mealBurdenScore: adjustedScore,
+    mealBurdenLevel: mealBurdenLevelFromScore(adjustedScore),
+    mealBurdenDescription: '등록 제품의 원재료·영양정보 반영',
     calibration: {
       applied: true,
       ruleId: normalizedProfile.id,
       ruleName: normalizedProfile.name,
       matchType,
       mode: normalizedProfile.mode,
-      rawEstimatedGlucoseRise: rawRise,
-      adjustedEstimatedGlucoseRise: adjustedRise,
+      rawMealBurdenScore: rawScore,
+      adjustedMealBurdenScore: adjustedScore,
       sampleCount: normalizedProfile.sampleCount,
-      note: normalizedProfile.note,
+      note: '등록 제품의 원재료·영양정보 반영',
     },
   };
 }
 
-export function glucoseRiskFromRise(rise) {
-  const normalizedRise = clampInteger(rise, 0, 140, 0);
-  if (normalizedRise >= 45) return 'high';
-  if (normalizedRise >= 25) return 'medium';
+export function mealBurdenLevelFromScore(score) {
+  const normalizedScore = clampInteger(score, 0, 100, 0);
+  if (normalizedScore >= 70) return 'high';
+  if (normalizedScore >= 40) return 'medium';
   return 'low';
 }
 
@@ -322,7 +313,7 @@ export function normalizeMenuKey(value) {
 function normalizeProfile(value) {
   if (!value || typeof value !== 'object') return null;
   const id = String(value.id || '').trim();
-  const name = String(value.name || '').trim();
+  const name = sanitizePublicText(value.name, '', 120);
   const mode = String(value.mode || '').trim();
   const adjustmentValue = Number(
     value.adjustmentValue ?? value.adjustment_value,
@@ -347,7 +338,11 @@ function normalizeProfile(value) {
   return {
     id,
     name,
-    description: String(value.description || ''),
+    description: sanitizePublicText(
+      value.description,
+      '등록 제품의 원재료·영양정보를 반영합니다.',
+      240,
+    ),
     sampleCount: clampInteger(
       value.sampleCount ?? value.sample_count,
       0,
@@ -357,7 +352,11 @@ function normalizeProfile(value) {
     mode,
     adjustmentValue,
     scoreOverride: parsedScoreOverride,
-    note: String(value.note || ''),
+    note: sanitizePublicText(
+      value.note,
+      '등록 제품의 원재료·영양정보 반영',
+      200,
+    ),
     active: value.active === true,
     approved:
       value.approved === true ||
@@ -378,7 +377,7 @@ function normalizeMenuRule(value) {
     ...profile,
     aliases: Array.isArray(value.aliases)
       ? value.aliases
-          .map((alias) => String(alias || '').trim())
+          .map((alias) => sanitizePublicText(alias, '', 120))
           .filter(Boolean)
       : [],
     priority: clampInteger(
@@ -414,4 +413,16 @@ function clampInteger(value, min, max, fallback) {
 function safeErrorMessage(error) {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function sanitizePublicText(value, fallback, maxLength) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!text || containsForbiddenPublicCopy(text)) return fallback;
+  return text.slice(0, maxLength);
+}
+
+function containsForbiddenPublicCopy(value) {
+  return /mg\s*\/\s*dL|혈당|당뇨|스파이크|피크|진단|치료|투약|인슐린|질병\s*(?:예방|개선|완화)/i.test(
+    value,
+  );
 }

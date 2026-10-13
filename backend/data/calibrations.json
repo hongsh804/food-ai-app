@@ -4,7 +4,7 @@
     {
       "id": "example-low-sugar-flour",
       "name": "저당밀가루 예시",
-      "description": "형식 확인용 비활성 템플릿입니다. 실제 측정 자료를 검토한 뒤 active를 true로 변경하세요.",
+      "description": "형식 확인용 비활성 템플릿입니다. 등록 제품의 원재료·영양정보를 검토한 뒤 active를 true로 변경하세요.",
       "sampleCount": 0,
       "mode": "multiplier",
       "adjustmentValue": 1.0,

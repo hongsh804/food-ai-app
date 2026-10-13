@@ -12,11 +12,13 @@ class HomeScreen extends StatelessWidget {
     required this.onCapture,
     required this.onOpenHistory,
     required this.onOpenInsights,
+    required this.onOpenProfile,
   });
 
   final VoidCallback onCapture;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenInsights;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,7 @@ class HomeScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 118),
             children: [
-              const _HomeHeader(),
+              _HomeHeader(onOpenProfile: onOpenProfile),
               const SizedBox(height: 26),
               Text(
                 _greeting(),
@@ -42,6 +44,12 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 17),
+              GradientButton(
+                label: '사진으로 식사 부담 확인',
+                icon: Icons.camera_alt_rounded,
+                onPressed: onCapture,
+              ),
+              const SizedBox(height: 14),
               _PredictionHero(
                 latest: records.isEmpty ? null : records.first,
                 onTap: records.isEmpty
@@ -89,15 +97,23 @@ class HomeScreen extends StatelessWidget {
   void _openResult(BuildContext context, MealRecord record) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            ResultScreen(analysis: record.analysis, showActionButtons: false),
+        builder: (_) => ResultScreen(
+          analysis: record.analysis,
+          imageBytes: record.previewImageBytes,
+          imageSourceLabel: record.previewImageBytes == null
+              ? null
+              : '저장된 음식 사진',
+          showActionButtons: false,
+        ),
       ),
     );
   }
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+  const _HomeHeader({required this.onOpenProfile});
+
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -106,9 +122,9 @@ class _HomeHeader extends StatelessWidget {
         const Text.rich(
           TextSpan(
             children: [
-              TextSpan(text: 'Gluco'),
+              TextSpan(text: 'LOW'),
               TextSpan(
-                text: 'Log',
+                text: '42',
                 style: TextStyle(color: AppColors.primary),
               ),
             ],
@@ -121,17 +137,25 @@ class _HomeHeader extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Container(
-          width: 42,
-          height: 42,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.ink,
-            size: 23,
+        Semantics(
+          button: true,
+          label: '마이 열기',
+          child: InkWell(
+            onTap: onOpenProfile,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                color: AppColors.ink,
+                size: 23,
+              ),
+            ),
           ),
         ),
       ],
@@ -148,10 +172,17 @@ class _PredictionHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final analysis = latest?.analysis;
-    final rise = analysis?.estimatedGlucoseRise ?? 0;
+    final score = analysis?.mealBurdenScore ?? 0;
     final values = analysis == null
         ? const [18.0, 24.0, 35.0, 52.0, 34.0, 22.0]
-        : [10.0, rise * .4, rise * .8, rise.toDouble(), rise * .62, rise * .3];
+        : [
+            10.0,
+            score * .4,
+            score * .8,
+            score.toDouble(),
+            score * .62,
+            score * .3,
+          ];
 
     return InkWell(
       borderRadius: BorderRadius.circular(24),
@@ -181,7 +212,7 @@ class _PredictionHero extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  analysis == null ? '첫 식사를 기록해보세요' : '최근 식사 AI 예측',
+                  analysis == null ? '첫 식사를 기록해보세요' : '최근 식사 부담 가이드',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -199,7 +230,7 @@ class _PredictionHero extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    analysis?.glucoseRisk.label ?? '분석하기',
+                    analysis?.mealBurdenLevel.label ?? '분석하기',
                     style: const TextStyle(
                       color: AppColors.primaryDark,
                       fontSize: 11,
@@ -229,16 +260,8 @@ class _PredictionHero extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: 3),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: analysis == null ? '--' : '+$rise'),
-                            const TextSpan(
-                              text: ' mg/dL',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
+                      Text(
+                        analysis?.mealBurdenLevel.label ?? '--',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 39,
@@ -247,7 +270,7 @@ class _PredictionHero extends StatelessWidget {
                         ),
                       ),
                       const Text(
-                        '예상 식후 혈당 상승폭',
+                        '식사 부담 가이드',
                         style: TextStyle(
                           color: Color(0xE6FFFFFF),
                           fontSize: 11,
@@ -272,8 +295,8 @@ class _PredictionHero extends StatelessWidget {
               ),
               child: Text(
                 analysis == null
-                    ? '카메라 버튼을 눌러 시작하세요'
-                    : '${analysis.estimatedPeakMinutes}분 전후 피크 · AI 추정값',
+                    ? '위 촬영 버튼을 눌러 시작하세요'
+                    : '사진·메뉴·분량을 바탕으로 한 AI 참고 가이드',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,
@@ -432,23 +455,29 @@ class _RecentMealTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primary.withValues(alpha: .16),
-                  AppColors.mint.withValues(alpha: .07),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(17),
-            ),
-            child: const Icon(
-              Icons.restaurant_menu_rounded,
-              color: AppColors.primaryDark,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: SizedBox(
+              width: 62,
+              height: 62,
+              child: record.previewImageBytes != null
+                  ? Image.memory(record.previewImageBytes!, fit: BoxFit.cover)
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.primary.withValues(alpha: .16),
+                            AppColors.mint.withValues(alpha: .07),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.restaurant_menu_rounded,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 13),
@@ -483,7 +512,7 @@ class _RecentMealTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '+${record.analysis.estimatedGlucoseRise}',
+                record.analysis.mealBurdenLevel.label,
                 style: const TextStyle(
                   color: AppColors.primaryDark,
                   fontSize: 22,
@@ -491,7 +520,7 @@ class _RecentMealTile extends StatelessWidget {
                 ),
               ),
               const Text(
-                'mg/dL 예상',
+                '식사 부담',
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 9,

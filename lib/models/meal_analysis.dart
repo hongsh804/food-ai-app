@@ -1,16 +1,16 @@
-enum GlucoseRisk {
+enum MealBurdenLevel {
   low('낮음'),
   medium('보통'),
   high('높음');
 
-  const GlucoseRisk(this.label);
+  const MealBurdenLevel(this.label);
 
   final String label;
 
-  static GlucoseRisk fromName(String name) {
-    return GlucoseRisk.values.firstWhere(
-      (risk) => risk.name == name,
-      orElse: () => GlucoseRisk.medium,
+  static MealBurdenLevel fromName(String name) {
+    return MealBurdenLevel.values.firstWhere(
+      (level) => level.name == name,
+      orElse: () => MealBurdenLevel.medium,
     );
   }
 }
@@ -28,9 +28,9 @@ class IngredientEstimate {
 
   factory IngredientEstimate.fromJson(Map<String, dynamic> json) {
     return IngredientEstimate(
-      name: json['name'] as String? ?? '알 수 없는 재료',
-      amount: json['amount'] as String? ?? '양 추정 어려움',
-      note: json['note'] as String? ?? '',
+      name: _safePublicText(json['name'] as String?, fallback: '알 수 없는 재료'),
+      amount: _safePublicText(json['amount'] as String?, fallback: '양 추정 어려움'),
+      note: _safeIngredientNote(json['note'] as String?),
     );
   }
 
@@ -46,8 +46,8 @@ class MealCalibration {
     required this.ruleName,
     required this.matchType,
     required this.mode,
-    required this.rawEstimatedGlucoseRise,
-    required this.adjustedEstimatedGlucoseRise,
+    required this.rawMealBurdenScore,
+    required this.adjustedMealBurdenScore,
     required this.sampleCount,
     required this.note,
   });
@@ -57,27 +57,38 @@ class MealCalibration {
   final String ruleName;
   final String matchType;
   final String mode;
-  final int rawEstimatedGlucoseRise;
-  final int adjustedEstimatedGlucoseRise;
+  final int rawMealBurdenScore;
+  final int adjustedMealBurdenScore;
   final int sampleCount;
   final String note;
 
   factory MealCalibration.fromJson(Map<String, dynamic> json) {
-    final rawRise = _intFromJson(json['rawEstimatedGlucoseRise']);
+    final rawScore = _scoreFromJson(
+      json['rawMealBurdenScore'],
+      legacyRise: json['rawEstimatedGlucoseRise'],
+    );
     return MealCalibration(
       applied: json['applied'] == true,
       ruleId: (json['ruleId'] as String? ?? '').trim(),
-      ruleName: (json['ruleName'] as String? ?? '').trim(),
+      ruleName: _safePublicText(
+        json['ruleName'] as String?,
+        fallback: appliedFallbackRuleName(json['applied']),
+      ),
       matchType: (json['matchType'] as String? ?? '').trim(),
       mode: (json['mode'] as String? ?? '').trim(),
-      rawEstimatedGlucoseRise: rawRise,
-      adjustedEstimatedGlucoseRise: _intFromJson(
-        json['adjustedEstimatedGlucoseRise'],
-        fallback: rawRise,
+      rawMealBurdenScore: rawScore,
+      adjustedMealBurdenScore: _scoreFromJson(
+        json['adjustedMealBurdenScore'],
+        legacyRise: json['adjustedEstimatedGlucoseRise'],
+        fallback: rawScore,
       ),
       sampleCount: _intFromJson(json['sampleCount']),
-      note: (json['note'] as String? ?? '').trim(),
+      note: _safeCalibrationNote(json['note'] as String?),
     );
+  }
+
+  static String appliedFallbackRuleName(Object? applied) {
+    return applied == true ? '등록 LOW42 제품' : '';
   }
 
   Map<String, dynamic> toJson() {
@@ -87,18 +98,40 @@ class MealCalibration {
       'ruleName': ruleName,
       'matchType': matchType,
       'mode': mode,
-      'rawEstimatedGlucoseRise': rawEstimatedGlucoseRise,
-      'adjustedEstimatedGlucoseRise': adjustedEstimatedGlucoseRise,
+      'rawMealBurdenScore': rawMealBurdenScore,
+      'adjustedMealBurdenScore': adjustedMealBurdenScore,
       'sampleCount': sampleCount,
       'note': note,
     };
   }
 
+  static int _scoreFromJson(
+    Object? value, {
+    Object? legacyRise,
+    int fallback = 0,
+  }) {
+    final score = _nullableIntFromJson(value);
+    if (score != null) return score.clamp(0, 100);
+    final rise = _nullableIntFromJson(legacyRise);
+    if (rise != null) return (rise * 1.6).round().clamp(0, 100);
+    return fallback;
+  }
+
   static int _intFromJson(Object? value, {int fallback = 0}) {
+    return _nullableIntFromJson(value) ?? fallback;
+  }
+
+  static int? _nullableIntFromJson(Object? value) {
     if (value is int) return value;
     if (value is num) return value.round();
-    if (value is String) return int.tryParse(value) ?? fallback;
-    return fallback;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static String _safeCalibrationNote(String? value) {
+    final note = value?.trim() ?? '';
+    if (_containsMedicalPredictionCopy(note)) return '';
+    return note;
   }
 }
 
@@ -106,16 +139,14 @@ class MealAnalysis {
   const MealAnalysis({
     required this.foodName,
     required this.dateLabel,
-    required this.glucoseSpikeScore,
-    required this.estimatedGlucoseRise,
-    required this.estimatedPeakMinutes,
+    required this.mealBurdenScore,
     required this.calories,
     required this.carbs,
     required this.protein,
     required this.fat,
     required this.sugar,
-    required this.glucoseRisk,
-    required this.glucoseDescription,
+    required this.mealBurdenLevel,
+    required this.mealBurdenDescription,
     this.portionDescription = '1인분 기준 추정',
     this.ingredients = const [],
     this.calibration,
@@ -123,50 +154,50 @@ class MealAnalysis {
 
   final String foodName;
   final String dateLabel;
-  final int glucoseSpikeScore;
-  final int estimatedGlucoseRise;
-  final int estimatedPeakMinutes;
+  final int mealBurdenScore;
   final int calories;
   final int carbs;
   final int protein;
   final int fat;
   final int sugar;
-  final GlucoseRisk glucoseRisk;
-  final String glucoseDescription;
+  final MealBurdenLevel mealBurdenLevel;
+  final String mealBurdenDescription;
   final String portionDescription;
   final List<IngredientEstimate> ingredients;
   final MealCalibration? calibration;
 
   factory MealAnalysis.fromJson(Map<String, dynamic> json) {
-    final glucoseRisk = GlucoseRisk.fromName(
-      json['glucoseRisk'] as String? ?? GlucoseRisk.medium.name,
+    final level = MealBurdenLevel.fromName(
+      (json['mealBurdenLevel'] ?? json['glucoseRisk']) as String? ??
+          MealBurdenLevel.medium.name,
     );
+    final score = _intFromJson(
+      json['mealBurdenScore'] ?? json['glucoseSpikeScore'],
+      _defaultBurdenScore(level),
+    ).clamp(0, 100);
 
     return MealAnalysis(
-      foodName: json['foodName'] as String? ?? '알 수 없는 음식',
+      foodName: _safePublicText(
+        json['foodName'] as String?,
+        fallback: '확인한 음식',
+      ),
       dateLabel: json['dateLabel'] as String? ?? '',
-      glucoseSpikeScore: _intFromJson(
-        json['glucoseSpikeScore'],
-        _defaultSpikeScore(glucoseRisk),
-      ),
-      estimatedGlucoseRise: _intFromJson(
-        json['estimatedGlucoseRise'],
-        _defaultRise(glucoseRisk),
-      ),
-      estimatedPeakMinutes: _intFromJson(
-        json['estimatedPeakMinutes'],
-        _defaultPeak(glucoseRisk),
-      ),
+      mealBurdenScore: score,
       calories: _intFromJson(json['calories'], 620),
       carbs: _intFromJson(json['carbs'], 72),
       protein: _intFromJson(json['protein'], 26),
       fat: _intFromJson(json['fat'], 20),
       sugar: _intFromJson(json['sugar'], 12),
-      glucoseRisk: glucoseRisk,
-      glucoseDescription:
-          json['glucoseDescription'] as String? ??
-          '사진과 메뉴명을 바탕으로 한 AI 추정값입니다. 실제 조리법과 섭취량에 따라 식후 혈당 상승폭은 달라질 수 있습니다.',
-      portionDescription: json['portionDescription'] as String? ?? '1인분 기준 추정',
+      mealBurdenLevel: level,
+      mealBurdenDescription: _guideDescription(
+        (json['mealBurdenDescription'] ?? json['glucoseDescription'])
+            as String?,
+        level,
+      ),
+      portionDescription: _safePublicText(
+        json['portionDescription'] as String?,
+        fallback: '사진 기준 약 1인분 추정',
+      ),
       ingredients: _ingredientsFromJson(json['ingredients']),
       calibration: _calibrationFromJson(json['calibration']),
     );
@@ -176,16 +207,14 @@ class MealAnalysis {
     return {
       'foodName': foodName,
       'dateLabel': dateLabel,
-      'glucoseSpikeScore': glucoseSpikeScore,
-      'estimatedGlucoseRise': estimatedGlucoseRise,
-      'estimatedPeakMinutes': estimatedPeakMinutes,
+      'mealBurdenScore': mealBurdenScore,
       'calories': calories,
       'carbs': carbs,
       'protein': protein,
       'fat': fat,
       'sugar': sugar,
-      'glucoseRisk': glucoseRisk.name,
-      'glucoseDescription': glucoseDescription,
+      'mealBurdenLevel': mealBurdenLevel.name,
+      'mealBurdenDescription': mealBurdenDescription,
       'portionDescription': portionDescription,
       'ingredients': [
         for (final ingredient in ingredients) ingredient.toJson(),
@@ -197,16 +226,14 @@ class MealAnalysis {
   MealAnalysis copyWith({
     String? foodName,
     String? dateLabel,
-    int? glucoseSpikeScore,
-    int? estimatedGlucoseRise,
-    int? estimatedPeakMinutes,
+    int? mealBurdenScore,
     int? calories,
     int? carbs,
     int? protein,
     int? fat,
     int? sugar,
-    GlucoseRisk? glucoseRisk,
-    String? glucoseDescription,
+    MealBurdenLevel? mealBurdenLevel,
+    String? mealBurdenDescription,
     String? portionDescription,
     List<IngredientEstimate>? ingredients,
     MealCalibration? calibration,
@@ -214,16 +241,15 @@ class MealAnalysis {
     return MealAnalysis(
       foodName: foodName ?? this.foodName,
       dateLabel: dateLabel ?? this.dateLabel,
-      glucoseSpikeScore: glucoseSpikeScore ?? this.glucoseSpikeScore,
-      estimatedGlucoseRise: estimatedGlucoseRise ?? this.estimatedGlucoseRise,
-      estimatedPeakMinutes: estimatedPeakMinutes ?? this.estimatedPeakMinutes,
+      mealBurdenScore: mealBurdenScore ?? this.mealBurdenScore,
       calories: calories ?? this.calories,
       carbs: carbs ?? this.carbs,
       protein: protein ?? this.protein,
       fat: fat ?? this.fat,
       sugar: sugar ?? this.sugar,
-      glucoseRisk: glucoseRisk ?? this.glucoseRisk,
-      glucoseDescription: glucoseDescription ?? this.glucoseDescription,
+      mealBurdenLevel: mealBurdenLevel ?? this.mealBurdenLevel,
+      mealBurdenDescription:
+          mealBurdenDescription ?? this.mealBurdenDescription,
       portionDescription: portionDescription ?? this.portionDescription,
       ingredients: ingredients ?? this.ingredients,
       calibration: calibration ?? this.calibration,
@@ -233,20 +259,18 @@ class MealAnalysis {
   static const MealAnalysis demoResult = MealAnalysis(
     foodName: '돈코츠 라멘',
     dateLabel: '오늘 점심',
-    glucoseSpikeScore: 88,
-    estimatedGlucoseRise: 55,
-    estimatedPeakMinutes: 75,
+    mealBurdenScore: 88,
     calories: 780,
     carbs: 82,
     protein: 30,
     fat: 34,
     sugar: 6,
-    glucoseRisk: GlucoseRisk.high,
-    glucoseDescription:
-        '면의 정제 탄수화물 비중이 높아 식후 혈당 상승폭이 크게 추정됩니다. 차슈나 계란, 숙주를 먼저 먹고 면 양을 줄이면 상승 부담을 낮추는 데 도움이 됩니다.',
+    mealBurdenLevel: MealBurdenLevel.high,
+    mealBurdenDescription:
+        '면의 정제 탄수화물 비중과 추정 분량이 커 식사 부담이 높게 분류됐습니다. 차슈나 계란, 숙주를 먼저 먹고 면 양을 조절해보세요.',
     portionDescription: '라멘 1그릇 기준 추정',
     ingredients: [
-      IngredientEstimate(name: '라멘 면', amount: '약 180g', note: '혈당 상승의 주 요인'),
+      IngredientEstimate(name: '라멘 면', amount: '약 180g', note: '식사 부담의 주 요인'),
       IngredientEstimate(name: '차슈', amount: '2~3장', note: '단백질/지방'),
       IngredientEstimate(name: '삶은 계란', amount: '1/2~1개', note: '단백질'),
       IngredientEstimate(name: '숙주/파', amount: '약간', note: '채소류'),
@@ -257,16 +281,14 @@ class MealAnalysis {
     MealAnalysis(
       foodName: '현미 닭가슴살 샐러드',
       dateLabel: '오늘 아침',
-      glucoseSpikeScore: 28,
-      estimatedGlucoseRise: 18,
-      estimatedPeakMinutes: 90,
+      mealBurdenScore: 28,
       calories: 430,
       carbs: 38,
       protein: 36,
       fat: 14,
       sugar: 7,
-      glucoseRisk: GlucoseRisk.low,
-      glucoseDescription: '식이섬유와 단백질 비중이 좋아 혈당 반응이 비교적 완만할 것으로 예상됩니다.',
+      mealBurdenLevel: MealBurdenLevel.low,
+      mealBurdenDescription: '식이섬유와 단백질 비중이 좋아 식사 부담이 낮게 분류됐습니다.',
       portionDescription: '샐러드 1접시 기준 추정',
       ingredients: [
         IngredientEstimate(name: '닭가슴살', amount: '약 100g'),
@@ -278,17 +300,15 @@ class MealAnalysis {
     MealAnalysis(
       foodName: '딸기 생크림 케이크',
       dateLabel: '어제 오후',
-      glucoseSpikeScore: 92,
-      estimatedGlucoseRise: 62,
-      estimatedPeakMinutes: 45,
+      mealBurdenScore: 92,
       calories: 560,
       carbs: 68,
       protein: 8,
       fat: 28,
       sugar: 46,
-      glucoseRisk: GlucoseRisk.high,
-      glucoseDescription:
-          '당류 비중이 높아 혈당이 빠르게 오를 가능성이 큽니다. 양을 줄이거나 식후 산책을 추천합니다.',
+      mealBurdenLevel: MealBurdenLevel.high,
+      mealBurdenDescription:
+          '당류 비중과 추정 분량이 커 식사 부담이 높게 분류됐습니다. 양을 줄이거나 식후 가볍게 걸어보세요.',
       portionDescription: '케이크 1조각 기준 추정',
       ingredients: [
         IngredientEstimate(name: '케이크 시트', amount: '1조각'),
@@ -299,16 +319,14 @@ class MealAnalysis {
     MealAnalysis(
       foodName: '연어 아보카도 포케',
       dateLabel: '어제 점심',
-      glucoseSpikeScore: 61,
-      estimatedGlucoseRise: 34,
-      estimatedPeakMinutes: 70,
+      mealBurdenScore: 61,
       calories: 610,
       carbs: 58,
       protein: 34,
       fat: 25,
       sugar: 9,
-      glucoseRisk: GlucoseRisk.medium,
-      glucoseDescription: '탄수화물은 중간 정도이며 지방과 단백질이 있어 식후 혈당 상승폭은 중간 정도로 예상됩니다.',
+      mealBurdenLevel: MealBurdenLevel.medium,
+      mealBurdenDescription: '탄수화물은 중간 정도이며 지방과 단백질이 있어 식사 부담이 보통으로 분류됐습니다.',
       portionDescription: '포케 1그릇 기준 추정',
       ingredients: [
         IngredientEstimate(name: '연어', amount: '약 80~100g'),
@@ -331,8 +349,8 @@ class MealAnalysis {
       return demoResult.copyWith(
         foodName: trimmedFoodName,
         dateLabel: '오늘 식사',
-        glucoseDescription:
-            '면류는 정제 탄수화물 비중이 높아 식후 혈당 상승폭이 크게 추정됩니다. 차슈, 계란, 채소를 먼저 먹고 면 양을 조절하면 부담을 낮추는 데 도움이 됩니다.',
+        mealBurdenDescription:
+            '면류는 정제 탄수화물 비중과 추정 분량이 커 식사 부담이 높게 분류됐습니다. 차슈, 계란, 채소를 먼저 먹고 면 양을 조절해보세요.',
       );
     }
 
@@ -340,17 +358,15 @@ class MealAnalysis {
       return const MealAnalysis(
         foodName: '샐러드',
         dateLabel: '오늘 식사',
-        glucoseSpikeScore: 28,
-        estimatedGlucoseRise: 18,
-        estimatedPeakMinutes: 90,
+        mealBurdenScore: 28,
         calories: 430,
         carbs: 32,
         protein: 30,
         fat: 19,
         sugar: 8,
-        glucoseRisk: GlucoseRisk.low,
-        glucoseDescription:
-            '채소와 단백질 비중이 높아 식후 혈당 상승폭은 작게 추정됩니다. 단, 드레싱이나 곁들인 빵이 많으면 상승폭이 커질 수 있습니다.',
+        mealBurdenLevel: MealBurdenLevel.low,
+        mealBurdenDescription:
+            '채소와 단백질 비중이 높아 식사 부담이 낮게 분류됐습니다. 단, 드레싱이나 곁들인 빵이 많으면 부담이 커질 수 있습니다.',
         portionDescription: '샐러드 1접시 기준 추정',
         ingredients: [
           IngredientEstimate(name: '채소', amount: '한 줌 이상'),
@@ -368,19 +384,17 @@ class MealAnalysis {
       return MealAnalysis(
         foodName: trimmedFoodName,
         dateLabel: '오늘 식사',
-        glucoseSpikeScore: 86,
-        estimatedGlucoseRise: 54,
-        estimatedPeakMinutes: 60,
+        mealBurdenScore: 86,
         calories: 760,
         carbs: 104,
         protein: 22,
         fat: 24,
         sugar: 18,
-        glucoseRisk: GlucoseRisk.high,
-        glucoseDescription:
-            '$trimmedFoodName은 탄수화물 또는 당류 비중이 높을 가능성이 있어 식후 혈당 상승폭이 크게 추정됩니다. 양 조절과 식후 가벼운 걷기를 권장합니다.',
+        mealBurdenLevel: MealBurdenLevel.high,
+        mealBurdenDescription:
+            '$trimmedFoodName은 탄수화물 또는 당류 비중과 추정 분량을 바탕으로 식사 부담이 높게 분류됐습니다. 양을 조절하고 식후 가볍게 걸어보세요.',
         portionDescription: '사진 또는 메뉴명 기준 1인분 추정',
-        ingredients: [
+        ingredients: const [
           IngredientEstimate(name: '주 탄수화물', amount: '1인분'),
           IngredientEstimate(name: '소스/양념', amount: '보통~많음'),
           IngredientEstimate(name: '단백질/채소', amount: '일부'),
@@ -391,17 +405,15 @@ class MealAnalysis {
     return MealAnalysis(
       foodName: trimmedFoodName,
       dateLabel: '오늘 식사',
-      glucoseSpikeScore: 62,
-      estimatedGlucoseRise: 34,
-      estimatedPeakMinutes: 70,
+      mealBurdenScore: 62,
       calories: 620,
       carbs: 72,
       protein: 26,
       fat: 20,
       sugar: 12,
-      glucoseRisk: GlucoseRisk.medium,
-      glucoseDescription:
-          '$trimmedFoodName은 사진과 메뉴명을 바탕으로 식후 혈당 상승폭이 중간 정도로 추정됩니다. 실제 조리법, 양, 소스에 따라 결과는 달라질 수 있습니다.',
+      mealBurdenLevel: MealBurdenLevel.medium,
+      mealBurdenDescription:
+          '$trimmedFoodName은 사진과 메뉴명, 추정 분량을 바탕으로 식사 부담이 보통으로 분류됐습니다. 실제 조리법, 양, 소스에 따라 결과는 달라질 수 있습니다.',
       portionDescription: '사진 또는 메뉴명 기준 1인분 추정',
       ingredients: const [
         IngredientEstimate(name: '주재료', amount: '1인분'),
@@ -410,37 +422,27 @@ class MealAnalysis {
     );
   }
 
-  static int _defaultSpikeScore(GlucoseRisk risk) {
-    switch (risk) {
-      case GlucoseRisk.low:
-        return 30;
-      case GlucoseRisk.medium:
-        return 62;
-      case GlucoseRisk.high:
-        return 88;
-    }
+  static int _defaultBurdenScore(MealBurdenLevel level) {
+    return switch (level) {
+      MealBurdenLevel.low => 30,
+      MealBurdenLevel.medium => 62,
+      MealBurdenLevel.high => 88,
+    };
   }
 
-  static int _defaultRise(GlucoseRisk risk) {
-    switch (risk) {
-      case GlucoseRisk.low:
-        return 18;
-      case GlucoseRisk.medium:
-        return 34;
-      case GlucoseRisk.high:
-        return 55;
+  static String _guideDescription(String? value, MealBurdenLevel level) {
+    final description = value?.trim() ?? '';
+    if (description.isNotEmpty &&
+        !_containsMedicalPredictionCopy(description)) {
+      return description;
     }
-  }
 
-  static int _defaultPeak(GlucoseRisk risk) {
-    switch (risk) {
-      case GlucoseRisk.low:
-        return 90;
-      case GlucoseRisk.medium:
-        return 70;
-      case GlucoseRisk.high:
-        return 60;
-    }
+    return switch (level) {
+      MealBurdenLevel.low => '사진 속 음식 구성과 추정 분량을 바탕으로 식사 부담이 낮게 분류됐습니다.',
+      MealBurdenLevel.medium => '사진 속 음식 구성과 추정 분량을 바탕으로 식사 부담이 보통으로 분류됐습니다.',
+      MealBurdenLevel.high =>
+        '사진 속 음식 구성과 추정 분량을 바탕으로 식사 부담이 높게 분류됐습니다. 양을 조절해보세요.',
+    };
   }
 
   static int _intFromJson(Object? value, int fallback) {
@@ -467,4 +469,39 @@ class MealAnalysis {
     if (value is! Map) return null;
     return MealCalibration.fromJson(Map<String, dynamic>.from(value));
   }
+}
+
+bool _containsMedicalPredictionCopy(String value) {
+  final lower = value.toLowerCase();
+  const blockedTerms = <String>[
+    'mg/dl',
+    'mg / dl',
+    '혈당',
+    '당뇨',
+    '스파이크',
+    '피크',
+    '실측',
+    '측정',
+    '예측',
+    '진단',
+    '치료',
+    '투약',
+    '인슐린',
+    '질병 예방',
+    '질병 개선',
+    '질병 완화',
+  ];
+  return blockedTerms.any(lower.contains);
+}
+
+String _safePublicText(String? value, {required String fallback}) {
+  final text = value?.trim() ?? '';
+  if (text.isEmpty || _containsMedicalPredictionCopy(text)) return fallback;
+  return text;
+}
+
+String _safeIngredientNote(String? value) {
+  final note = value?.trim() ?? '';
+  if (_containsMedicalPredictionCopy(note)) return '식사 구성 참고';
+  return note;
 }

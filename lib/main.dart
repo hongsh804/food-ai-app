@@ -5,12 +5,14 @@ import 'screens/app_shell.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/backend_settings.dart';
 import 'services/meal_history_store.dart';
+import 'services/membership_store.dart';
 import 'widgets/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await BackendSettings.instance.initialize();
   await MealHistoryStore.instance.load();
+  await MembershipStore.instance.load();
   final preferences = await SharedPreferences.getInstance();
   final hasSeenOnboarding =
       preferences.getBool('has_seen_onboarding_v2') ?? false;
@@ -46,7 +48,7 @@ class _FoodAiAppState extends State<FoodAiApp> {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'GlucoLog',
+      title: 'LOW42',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: colorScheme,

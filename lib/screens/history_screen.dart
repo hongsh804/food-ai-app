@@ -110,8 +110,14 @@ class HistoryScreen extends StatelessWidget {
   void _openResult(BuildContext context, MealRecord record) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            ResultScreen(analysis: record.analysis, showActionButtons: false),
+        builder: (_) => ResultScreen(
+          analysis: record.analysis,
+          imageBytes: record.previewImageBytes,
+          imageSourceLabel: record.previewImageBytes == null
+              ? null
+              : '저장된 음식 사진',
+          showActionButtons: false,
+        ),
       ),
     );
   }
@@ -147,15 +153,15 @@ class _HistoryOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rises = records
+    final scores = records
         .take(7)
-        .map((record) => record.analysis.estimatedGlucoseRise)
+        .map((record) => record.analysis.mealBurdenScore)
         .toList();
-    final average = rises.isEmpty
+    final average = scores.isEmpty
         ? 0
-        : (rises.reduce((a, b) => a + b) / rises.length).round();
+        : (scores.reduce((a, b) => a + b) / scores.length).round();
     final balanced = records
-        .where((record) => record.analysis.glucoseRisk.name == 'low')
+        .where((record) => record.analysis.mealBurdenLevel.name == 'low')
         .length;
     return AppCard(
       color: AppColors.surfaceWarm,
@@ -166,7 +172,7 @@ class _HistoryOverview extends StatelessWidget {
           ),
           Container(width: 1, height: 42, color: AppColors.border),
           Expanded(
-            child: _OverviewValue(value: '+$average', label: '최근 평균'),
+            child: _OverviewValue(value: '$average', label: '평균 부담 점수'),
           ),
           Container(width: 1, height: 42, color: AppColors.border),
           Expanded(
@@ -228,16 +234,20 @@ class _HistoryTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceWarm,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(
-              Icons.ramen_dining_rounded,
-              color: AppColors.primaryDark,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: record.previewImageBytes != null
+                  ? Image.memory(record.previewImageBytes!, fit: BoxFit.cover)
+                  : Container(
+                      color: AppColors.surfaceWarm,
+                      child: const Icon(
+                        Icons.ramen_dining_rounded,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -271,14 +281,21 @@ class _HistoryTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '+${record.analysis.estimatedGlucoseRise}',
+                record.analysis.mealBurdenLevel.label,
                 style: const TextStyle(
                   color: AppColors.primaryDark,
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              RiskPill(risk: record.analysis.glucoseRisk, compact: true),
+              const Text(
+                '식사 부담',
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
           PopupMenuButton<String>(

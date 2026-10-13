@@ -144,21 +144,21 @@ class GradientButton extends StatelessWidget {
 }
 
 class RiskPill extends StatelessWidget {
-  const RiskPill({super.key, required this.risk, this.compact = false});
+  const RiskPill({super.key, required this.level, this.compact = false});
 
-  final GlucoseRisk risk;
+  final MealBurdenLevel level;
   final bool compact;
 
-  Color get color => switch (risk) {
-    GlucoseRisk.low => AppColors.low,
-    GlucoseRisk.medium => AppColors.medium,
-    GlucoseRisk.high => AppColors.high,
+  Color get color => switch (level) {
+    MealBurdenLevel.low => AppColors.low,
+    MealBurdenLevel.medium => AppColors.medium,
+    MealBurdenLevel.high => AppColors.high,
   };
 
-  String get label => switch (risk) {
-    GlucoseRisk.low => '낮음',
-    GlucoseRisk.medium => '보통',
-    GlucoseRisk.high => '높음',
+  String get label => switch (level) {
+    MealBurdenLevel.low => '낮음',
+    MealBurdenLevel.medium => '보통',
+    MealBurdenLevel.high => '높음',
   };
 
   @override

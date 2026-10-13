@@ -1,9 +1,9 @@
-# GlucoLog Gemini API 서버
+# LOW42 Gemini API 서버
 
 Flutter APK에 Gemini API 키를 넣지 않고, PC 또는 배포 서버가 Gemini를 대신 호출하는 구조입니다.
 
 ```text
-GlucoLog 앱 → GlucoLog Node 서버 → Gemini API
+LOW42 앱 → LOW42 Node 서버 → Gemini API
 ```
 
 앱에는 서버 주소만 들어가고 Gemini 키는 `backend/.env` 또는 배포 서비스의 환경 변수에만 저장됩니다.
@@ -137,12 +137,12 @@ flutter build apk --release --dart-define=API_BASE_URL=https://서비스이름.o
 
 - `GET /health`: 서버와 키 설정 상태 확인
 - `POST /api/identify-food`: 사진을 받아 음식 후보 목록 생성
-- `POST /api/analyze-meal`: 확인된 메뉴명과 사진으로 영양 성분, 예상 혈당 상승폭, 코칭 생성
+- `POST /api/analyze-meal`: 확인된 메뉴명과 사진으로 분량·영양 성분·식사 부담 가이드 생성
 
 사진은 Flutter 앱에서 JPEG 바이트를 Base64 문자열로 바꿔 서버로 전송합니다. 서버는 Gemini의 구조화 JSON 응답을 숫자 범위에 맞게 정리한 뒤 앱에 반환합니다.
 
 ## 주의
 
-- 결과는 음식 사진 기반 AI 추정값입니다.
-- 실제 혈당 측정값, 진단, 치료 또는 투약 판단을 대신하지 않습니다.
+- 결과는 추정 분량과 영양 구성을 바탕으로 한 음식 선택 가이드입니다.
+- 개인 혈당 수치나 혈당 상승폭을 산출하지 않으며 진단, 치료 또는 투약 판단을 대신하지 않습니다.
 - 공개 배포 시에는 HTTPS, 요청 크기 제한, 사용자 인증, 호출 횟수 제한, 로그의 개인정보 제거가 추가로 필요합니다.

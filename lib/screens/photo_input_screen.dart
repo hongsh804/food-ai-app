@@ -26,8 +26,9 @@ class _PhotoInputScreenState extends State<PhotoInputScreen> {
     try {
       final image = await _picker.pickImage(
         source: source,
-        imageQuality: 84,
-        maxWidth: 1600,
+        imageQuality: 78,
+        maxWidth: 1280,
+        maxHeight: 1280,
       );
       if (image == null) return;
       final bytes = await image.readAsBytes();
@@ -112,7 +113,7 @@ class _PhotoInputScreenState extends State<PhotoInputScreen> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  hasImage ? '사진이 선명한지 확인해주세요' : '음식 전체가 보이도록 촬영해주세요',
+                  hasImage ? '사진이 선명한지 확인해주세요' : '음식과 숟가락·젓가락이 함께 보이게 촬영해주세요',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -123,7 +124,7 @@ class _PhotoInputScreenState extends State<PhotoInputScreen> {
                 Text(
                   hasImage
                       ? (_selectedSourceLabel ?? '선택한 사진')
-                      : 'AI가 음식과 영양 정보를 분석해드려요',
+                      : '식기와 접시 크기를 참고해 음식 양을 추정해요',
                   style: const TextStyle(
                     color: Color(0xCCFFFFFF),
                     fontSize: 12,
@@ -296,7 +297,7 @@ class _CameraControls extends StatelessWidget {
                 ),
                 const SizedBox(height: 17),
                 GradientButton(
-                  label: 'AI 분석 시작',
+                  label: '식사 부담 가이드 보기',
                   icon: Icons.auto_awesome_rounded,
                   onPressed: isPicking ? null : onAnalyze,
                 ),

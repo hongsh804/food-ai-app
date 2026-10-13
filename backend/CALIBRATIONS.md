@@ -1,23 +1,23 @@
-# 혈당 보정 규칙
+# 식사 부담 가이드 조정 규칙
 
-보정 규칙은 Gemini가 만든 `estimatedGlucoseRise`를 서버에서 한 번 더
-조정합니다. 기존 영양 분석은 그대로 Gemini를 사용합니다. 앱이 명시적으로
+조정 규칙은 Gemini가 만든 `mealBurdenScore`를 서버에서 한 번 더
+조정합니다. 분량과 영양 분석은 그대로 Gemini를 사용합니다. 앱이 명시적으로
 `calibrationProfileId`를 보내면 해당 제품 프로필을 우선 적용하고, 프로필을
 보내지 않았을 때만 음식명과 정확히 일치하는 활성 메뉴 규칙을 자동 적용합니다.
 
-## 보정 모드
+## 조정 모드
 
-- `fixed`: 최종 상승폭을 `adjustment_value`로 고정
-- `delta`: Gemini 상승폭에 `adjustment_value`를 더함
-- `multiplier`: Gemini 상승폭에 `adjustment_value`를 곱함
+- `fixed`: 최종 식사 부담 점수를 `adjustment_value`로 고정
+- `delta`: Gemini 식사 부담 점수에 `adjustment_value`를 더함
+- `multiplier`: Gemini 식사 부담 점수에 `adjustment_value`를 곱함
 
-최종 상승폭은 0~140 범위로 제한됩니다. 위험도는 최종 상승폭으로 다시
-계산되며, `score_override`가 없으면 부담 점수는 `최종 상승폭 * 1.6`으로
-계산해 0~100 범위로 제한합니다.
+최종 점수는 0~100 범위로 제한됩니다. `score_override`가 있으면 모드 계산값보다
+우선합니다. 최종 점수가 40 미만이면 `low`, 40 이상 70 미만이면 `medium`,
+70 이상이면 `high`로 분류합니다.
 
-규칙은 `active`만 켠다고 적용되지 않습니다. 최소 3건의 측정 표본과
+규칙은 `active`만 켠다고 적용되지 않습니다. 최소 3건의 검토된 원재료·영양정보와
 `approved_at`, `approved_by`가 모두 있어야 합니다. 검토되지 않은 규칙이나
-표본이 부족한 규칙은 카탈로그·사진 추천·메뉴 자동 보정에서 모두 제외됩니다.
+자료가 부족한 규칙은 카탈로그·사진 추천·메뉴 자동 조정에서 모두 제외됩니다.
 
 ## 저장소 선택
 
@@ -38,16 +38,16 @@ migrations/001_calibrations.sql
 외부 PostgreSQL이 TLS를 요구하면 기본 설정을 그대로 사용합니다. 로컬처럼
 TLS가 없는 DB만 `DATABASE_SSL=false`를 설정합니다.
 
-`calibration_measurements`에는 보정 계산의 근거가 되는 원자료를 보관합니다.
-제품 프로필 또는 메뉴 규칙 중 하나에만 연결되며, 식전값·식후 최고값·최고값
-도달 시간·분량·AI 원본 예상값을 기록합니다. `user_code`에는 이름·전화번호가
-아닌 익명 코드만 사용하고, 메모에도 개인정보를 넣지 않습니다.
+기존 DB의 `calibration_measurements` 테이블과 과거 컬럼명은 배포 호환을 위해
+당분간 유지합니다. 공개 API는 해당 이름이나 개인 건강 수치를 반환하지 않으며,
+새 규칙은 등록 제품의 원재료·영양정보 검토 결과를 식사 부담 점수에 반영하는
+용도로만 사용합니다. 개인정보는 규칙이나 메모에 넣지 않습니다.
 
 ## 규칙 우선순위
 
 1. 요청의 유효한 `calibrationProfileId`
 2. `calibrationProfileId`가 없을 때 메뉴명 또는 별칭 정확 매칭
-3. 일치 규칙이 없으면 보정하지 않음
+3. 일치 규칙이 없으면 점수를 조정하지 않음
 
 잘못되거나 비활성인 `calibrationProfileId`가 요청되면 메뉴 규칙으로 조용히
 우회하지 않습니다. 메뉴 규칙끼리 같은 이름 또는 별칭에 일치하면 숫자가 큰
@@ -71,7 +71,7 @@ INSERT INTO calibration_profiles (
   'delta',
   20,
   NULL,
-  '등록 측정 자료 12건 기준 보정',
+  '등록 제품 원재료·영양정보 12건 검토',
   TRUE,
   NOW(),
   'data-review-2026-08',
@@ -95,7 +95,7 @@ VALUES ('64자리_sha256', 'low-sugar-flour-gimbap', TRUE);
 않습니다. 저당밀가루처럼 사진만으로 구별할 수 없는 재료는 사용자가 앱에서
 프로필을 직접 선택해야 합니다.
 
-메뉴별 자동 보정은 별도 테이블에 등록합니다.
+메뉴별 자동 조정은 별도 테이블에 등록합니다.
 
 ```sql
 INSERT INTO calibration_menu_rules (
@@ -109,7 +109,7 @@ INSERT INTO calibration_menu_rules (
   'delta',
   20,
   NULL,
-  '등록 측정 자료 20건 기준 보정',
+  '등록 메뉴 원재료·영양정보 20건 검토',
   100,
   TRUE,
   NOW(),
@@ -118,7 +118,7 @@ INSERT INTO calibration_menu_rules (
 );
 ```
 
-위 예시는 Gemini 상승폭이 60일 때 20을 더해 최종 80으로 만듭니다. 항상
+위 예시는 Gemini 식사 부담 점수가 60일 때 20을 더해 최종 80으로 만듭니다. 항상
 80으로 고정하려면 `mode='fixed'`, `adjustment_value=80`을 사용합니다.
 
 ## 읽기 API
@@ -130,8 +130,10 @@ INSERT INTO calibration_menu_rules (
   - `suggestedProfileId`는 정확한 이미지 SHA-256이 등록된 경우에만 설정
 - `POST /api/analyze-meal`
   - 요청에 선택적 `calibrationProfileId` 추가
-  - 기존 분석 필드를 유지하고 `calibration` 메타데이터 추가
+  - `mealBurdenScore`, `mealBurdenLevel`, `mealBurdenDescription` 반환
+  - `calibration` 메타데이터에는 `rawMealBurdenScore`,
+    `adjustedMealBurdenScore` 추가
   - 프로필 ID가 없으면 음식명과 일치하는 활성 메뉴 규칙을 자동 적용
 
-공개 서버에는 보정값을 수정하는 쓰기 API가 없습니다. 데이터 변경은 DB
+공개 서버에는 조정값을 수정하는 쓰기 API가 없습니다. 데이터 변경은 DB
 관리 화면 또는 승인된 배포 커밋으로만 수행합니다.

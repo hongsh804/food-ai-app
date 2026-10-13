@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'insights_screen.dart';
 import 'photo_input_screen.dart';
 import 'profile_screen.dart';
+import 'shop_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -26,6 +27,13 @@ class _AppShellState extends State<AppShell> {
 
   void _selectTab(int index) => setState(() => _selectedIndex = index);
 
+  Future<void> _openProfile() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -33,10 +41,11 @@ class _AppShellState extends State<AppShell> {
         onCapture: _openCamera,
         onOpenHistory: () => _selectTab(1),
         onOpenInsights: () => _selectTab(2),
+        onOpenProfile: _openProfile,
       ),
       const HistoryScreen(embedded: true),
       const InsightsScreen(),
-      const ProfileScreen(),
+      ShopScreen(onOpenProfile: _openProfile),
     ];
 
     return Scaffold(
@@ -59,7 +68,7 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
         child: IconButton(
-          tooltip: '음식 촬영',
+          tooltip: '식사 촬영',
           onPressed: _openCamera,
           icon: const Icon(
             Icons.camera_alt_rounded,
@@ -115,15 +124,15 @@ class _AppBottomBar extends StatelessWidget {
           Expanded(
             child: _NavItem(
               icon: Icons.bar_chart_rounded,
-              label: '분석',
+              label: '가이드',
               selected: selectedIndex == 2,
               onTap: () => onSelected(2),
             ),
           ),
           Expanded(
             child: _NavItem(
-              icon: Icons.person_outline_rounded,
-              label: '마이',
+              icon: Icons.shopping_bag_outlined,
+              label: '쇼핑',
               selected: selectedIndex == 3,
               onTap: () => onSelected(3),
             ),

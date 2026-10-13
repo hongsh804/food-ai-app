@@ -178,7 +178,7 @@ class _FoodIdentificationScreenState extends State<FoodIdentificationScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              '등록 제품을 선택할 때만 해당 혈당 보정값을 적용합니다. 등록 사진 일치는 자동으로 적용되지 않습니다.',
+              '등록 제품을 선택할 때만 승인된 LOW42 제품 가이드를 적용합니다. 사진이 비슷하다는 이유만으로 자동 적용하지 않습니다.',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 11,
@@ -201,9 +201,7 @@ class _FoodIdentificationScreenState extends State<FoodIdentificationScreen> {
                     const Divider(height: 1, indent: 52),
                     _CalibrationProfileOption(
                       title: profile.name,
-                      description: profile.description.isEmpty
-                          ? '등록된 제품·레시피 보정을 적용합니다.'
-                          : profile.description,
+                      description: '등록 제품의 원재료·영양 정보를 식사 부담 가이드에 반영합니다.',
                       sampleCount: profile.sampleCount,
                       suggested: profile.id == widget.suggestedProfileId,
                       selected: _selectedProfileId == profile.id,
@@ -243,13 +241,13 @@ class _FoodIdentificationScreenState extends State<FoodIdentificationScreen> {
             ),
             const SizedBox(height: 18),
             GradientButton(
-              label: '이 음식으로 분석하기',
+              label: '식사 부담 가이드 만들기',
               icon: Icons.auto_awesome_rounded,
               onPressed: _controller.text.trim().isEmpty ? null : _submit,
             ),
             const SizedBox(height: 16),
             const Text(
-              '메뉴명이 정확할수록 영양 성분과 식후 혈당 부담 예측이 더 유용해집니다.',
+              '메뉴명과 실제 분량이 정확할수록 영양 정보와 식사 부담 가이드가 더 유용해집니다.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.muted,
@@ -356,7 +354,7 @@ class _CalibrationProfileOption extends StatelessWidget {
                   if (sampleCount > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '보정 표본 $sampleCount건',
+                      '검토된 제품 정보 $sampleCount건',
                       style: const TextStyle(
                         color: AppColors.primaryDark,
                         fontSize: 9,

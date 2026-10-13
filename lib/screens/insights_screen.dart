@@ -26,16 +26,13 @@ class InsightsScreen extends StatelessWidget {
           final values = records.isEmpty
               ? const [18.0, 30.0, 24.0, 42.0, 20.0, 35.0, 27.0]
               : records
-                    .map(
-                      (record) =>
-                          record.analysis.estimatedGlucoseRise.toDouble(),
-                    )
+                    .map((record) => record.analysis.mealBurdenScore.toDouble())
                     .toList();
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 118),
             children: [
               const Text(
-                '분석',
+                '식사 부담 가이드',
                 style: TextStyle(
                   color: AppColors.ink,
                   fontSize: 26,
@@ -44,7 +41,7 @@ class InsightsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               const Text(
-                '최근 식사에서 혈당 부담 패턴을 찾아봤어요.',
+                '최근 식사의 양과 영양 구성을 바탕으로 부담 경향을 정리했어요.',
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 13,
@@ -141,7 +138,7 @@ class _TrendCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '평균 예상 상승폭',
+            '평균 식사 부담 점수',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 12,
@@ -152,7 +149,7 @@ class _TrendCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                '+$average',
+                '$average',
                 style: const TextStyle(
                   color: AppColors.ink,
                   fontSize: 31,
@@ -161,7 +158,7 @@ class _TrendCard extends StatelessWidget {
               ),
               const SizedBox(width: 5),
               const Text(
-                'mg/dL',
+                '/100',
                 style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 12,
@@ -169,7 +166,7 @@ class _TrendCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const RiskPill(risk: GlucoseRisk.medium),
+              RiskPill(level: _levelFromGuideScore(average)),
             ],
           ),
           const SizedBox(height: 18),
@@ -211,32 +208,32 @@ class _StatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rises = records
-        .map((record) => record.analysis.estimatedGlucoseRise)
+    final scores = records
+        .map((record) => record.analysis.mealBurdenScore)
         .toList();
-    final high = rises.isEmpty ? 0 : rises.reduce(math.max);
-    final low = rises.isEmpty ? 0 : rises.reduce(math.min);
+    final high = scores.isEmpty ? 0 : scores.reduce(math.max);
+    final low = scores.isEmpty ? 0 : scores.reduce(math.min);
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '혈당 부담 요약',
+            '식사 부담 요약',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 15),
           _StatRow(
             icon: Icons.arrow_upward_rounded,
             color: AppColors.high,
-            label: '최고 예상 상승폭',
-            value: '+$high mg/dL',
+            label: '가장 높은 부담 점수',
+            value: '$high/100',
           ),
           const Divider(height: 24),
           _StatRow(
             icon: Icons.arrow_downward_rounded,
             color: AppColors.blue,
-            label: '최저 예상 상승폭',
-            value: '+$low mg/dL',
+            label: '가장 낮은 부담 점수',
+            value: '$low/100',
           ),
           const Divider(height: 24),
           _StatRow(
@@ -309,10 +306,10 @@ class _CoachingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final highCount = records
-        .where((record) => record.analysis.glucoseRisk.name == 'high')
+        .where((record) => record.analysis.mealBurdenLevel.name == 'high')
         .length;
     final message = highCount >= 3
-        ? '최근 혈당 부담이 높은 식사가 잦아요. 다음 식사에는 채소와 단백질을 먼저 먹고, 정제 탄수화물 양을 조금 줄여보세요.'
+        ? '최근 식사 부담이 높은 기록이 잦아요. 다음 식사에는 채소와 단백질을 먼저 먹고, 정제 탄수화물 양을 조금 줄여보세요.'
         : '최근 식사 흐름이 비교적 안정적이에요. 지금처럼 채소와 단백질을 챙기고 식후 10분 걷기를 이어가보세요.';
     return AppCard(
       color: AppColors.surfaceWarm,
@@ -364,7 +361,7 @@ class _SafetyCard extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 8),
       child: Text(
-        '모든 수치는 사진과 메뉴 정보를 바탕으로 한 AI 추정치입니다. 실제 혈당 측정 결과 및 의료진의 판단과 다를 수 있습니다.',
+        '모든 가이드와 영양 정보는 사진·메뉴·추정 분량을 바탕으로 한 일반 참고값입니다. 실제 섭취량과 조리법에 따라 결과는 달라질 수 있습니다.',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: AppColors.muted,
@@ -375,4 +372,10 @@ class _SafetyCard extends StatelessWidget {
       ),
     );
   }
+}
+
+MealBurdenLevel _levelFromGuideScore(int score) {
+  if (score >= 70) return MealBurdenLevel.high;
+  if (score >= 40) return MealBurdenLevel.medium;
+  return MealBurdenLevel.low;
 }

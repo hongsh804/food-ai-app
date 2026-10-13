@@ -4,35 +4,29 @@ import '../models/meal_analysis.dart';
 import 'app_colors.dart';
 
 class RiskBadge extends StatelessWidget {
-  const RiskBadge({
-    super.key,
-    required this.risk,
-    required this.estimatedRise,
-    this.compact = false,
-  });
+  const RiskBadge({super.key, required this.level, this.compact = false});
 
-  final GlucoseRisk risk;
-  final int estimatedRise;
+  final MealBurdenLevel level;
   final bool compact;
 
   Color get _color {
-    switch (risk) {
-      case GlucoseRisk.low:
+    switch (level) {
+      case MealBurdenLevel.low:
         return AppColors.low;
-      case GlucoseRisk.medium:
+      case MealBurdenLevel.medium:
         return AppColors.medium;
-      case GlucoseRisk.high:
+      case MealBurdenLevel.high:
         return AppColors.high;
     }
   }
 
   Color get _backgroundColor {
-    if (risk == GlucoseRisk.low) return AppColors.lowSoft;
+    if (level == MealBurdenLevel.low) return AppColors.lowSoft;
     return _color.withValues(alpha: 0.12);
   }
 
   Color get _borderColor {
-    if (risk == GlucoseRisk.low) return AppColors.lowBorder;
+    if (level == MealBurdenLevel.low) return AppColors.lowBorder;
     return _color.withValues(alpha: 0.22);
   }
 
@@ -52,13 +46,13 @@ class RiskBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.water_drop_rounded,
+            Icons.restaurant_rounded,
             size: compact ? 14 : 18,
             color: _color,
           ),
           const SizedBox(width: 6),
           Text(
-            '혈당 +$estimatedRise mg/dL',
+            '식사 부담 ${level.label}',
             style: TextStyle(
               color: _color,
               fontSize: compact ? 12 : 14,

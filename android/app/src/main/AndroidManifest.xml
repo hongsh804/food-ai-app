@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="GlucoLog"
+        android:label="LOW42"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

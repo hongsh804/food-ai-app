@@ -60,6 +60,7 @@ class AiApiService {
         .whereType<String>()
         .map((candidate) => candidate.trim())
         .where((candidate) => candidate.isNotEmpty)
+        .where((candidate) => !_containsUnsafeMedicalCopy(candidate))
         .take(5)
         .toList();
 
@@ -283,6 +284,29 @@ class AiApiService {
       '[AiApiService] response status=$statusCode bytes=$byteLength keys=$keys',
     );
   }
+}
+
+bool _containsUnsafeMedicalCopy(String value) {
+  final lower = value.toLowerCase();
+  const blockedTerms = <String>[
+    'mg/dl',
+    'mg / dl',
+    '혈당',
+    '당뇨',
+    '스파이크',
+    '피크',
+    '실측',
+    '측정',
+    '예측',
+    '진단',
+    '치료',
+    '투약',
+    '인슐린',
+    '질병 예방',
+    '질병 개선',
+    '질병 완화',
+  ];
+  return blockedTerms.any(lower.contains);
 }
 
 class BackendHealth {

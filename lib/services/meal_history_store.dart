@@ -54,10 +54,16 @@ class MealHistoryStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<MealRecord> addAnalysis(MealAnalysis analysis) async {
+  Future<MealRecord> addAnalysis(
+    MealAnalysis analysis, {
+    Uint8List? previewImageBytes,
+  }) async {
     await load();
 
-    final record = MealRecord.create(analysis);
+    final record = MealRecord.create(
+      analysis,
+      previewImageBytes: previewImageBytes,
+    );
     _records.insert(0, record);
     await _save();
     notifyListeners();
@@ -116,17 +122,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '그릭요거트 그래놀라',
           dateLabel: '오늘 아침',
-          glucoseSpikeScore: 48,
-          estimatedGlucoseRise: 27,
-          estimatedPeakMinutes: 55,
+          mealBurdenScore: 48,
           calories: 360,
           carbs: 44,
           protein: 18,
           fat: 11,
           sugar: 18,
-          glucoseRisk: GlucoseRisk.medium,
-          glucoseDescription:
-              '그래놀라와 과일의 당류가 있어 혈당이 중간 정도 오를 수 있어요. 요거트 단백질이 상승 속도를 일부 완만하게 만듭니다.',
+          mealBurdenLevel: MealBurdenLevel.medium,
+          mealBurdenDescription:
+              '그래놀라와 과일의 당류를 고려해 식사 부담이 보통으로 분류됐습니다. 요거트 단백질을 함께 먹는 구성이에요.',
         ),
       ),
       _sampleRecord(
@@ -136,17 +140,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '비빔밥',
           dateLabel: '어제 점심',
-          glucoseSpikeScore: 66,
-          estimatedGlucoseRise: 38,
-          estimatedPeakMinutes: 70,
+          mealBurdenScore: 66,
           calories: 650,
           carbs: 88,
           protein: 24,
           fat: 18,
           sugar: 12,
-          glucoseRisk: GlucoseRisk.medium,
-          glucoseDescription:
-              '밥 양이 혈당 반응을 크게 좌우합니다. 채소와 계란을 먼저 먹고 밥을 조금 남기면 스파이크 부담을 줄일 수 있어요.',
+          mealBurdenLevel: MealBurdenLevel.medium,
+          mealBurdenDescription:
+              '밥의 추정 분량이 식사 부담에 큰 영향을 줍니다. 채소와 계란을 먼저 먹고 밥 양을 조금 줄여보세요.',
         ),
       ),
       _sampleRecord(
@@ -156,17 +158,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '떡볶이와 김밥',
           dateLabel: '2일 전 저녁',
-          glucoseSpikeScore: 94,
-          estimatedGlucoseRise: 68,
-          estimatedPeakMinutes: 45,
+          mealBurdenScore: 94,
           calories: 920,
           carbs: 142,
           protein: 22,
           fat: 26,
           sugar: 28,
-          glucoseRisk: GlucoseRisk.high,
-          glucoseDescription:
-              '떡과 김밥의 정제 탄수화물이 겹쳐 식후 혈당이 빠르게 오를 가능성이 큽니다. 양 조절과 식후 걷기가 특히 중요해요.',
+          mealBurdenLevel: MealBurdenLevel.high,
+          mealBurdenDescription:
+              '떡과 김밥의 정제 탄수화물이 겹치고 추정 분량도 커 식사 부담이 높게 분류됐습니다. 양을 조절하고 식후 걸어보세요.',
         ),
       ),
       _sampleRecord(
@@ -176,16 +176,14 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '연어 아보카도 샐러드',
           dateLabel: '3일 전 점심',
-          glucoseSpikeScore: 24,
-          estimatedGlucoseRise: 14,
-          estimatedPeakMinutes: 95,
+          mealBurdenScore: 24,
           calories: 520,
           carbs: 22,
           protein: 34,
           fat: 32,
           sugar: 7,
-          glucoseRisk: GlucoseRisk.low,
-          glucoseDescription: '탄수화물 비중이 낮고 단백질과 지방이 충분해 혈당 상승은 완만할 것으로 예상됩니다.',
+          mealBurdenLevel: MealBurdenLevel.low,
+          mealBurdenDescription: '탄수화물 비중이 낮고 단백질과 지방이 충분해 식사 부담이 낮게 분류됐습니다.',
         ),
       ),
       _sampleRecord(
@@ -201,17 +199,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '현미 닭가슴살 도시락',
           dateLabel: '5일 전 점심',
-          glucoseSpikeScore: 36,
-          estimatedGlucoseRise: 21,
-          estimatedPeakMinutes: 85,
+          mealBurdenScore: 36,
           calories: 540,
           carbs: 58,
           protein: 42,
           fat: 13,
           sugar: 6,
-          glucoseRisk: GlucoseRisk.low,
-          glucoseDescription:
-              '현미와 단백질 조합이라 혈당 상승은 비교적 완만할 것으로 예상됩니다. 다만 밥 양이 많으면 상승폭이 커질 수 있어요.',
+          mealBurdenLevel: MealBurdenLevel.low,
+          mealBurdenDescription:
+              '현미와 단백질 조합이라 식사 부담이 낮게 분류됐습니다. 다만 밥 양이 많으면 부담이 커질 수 있어요.',
         ),
       ),
       _sampleRecord(
@@ -221,17 +217,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '토마토 파스타',
           dateLabel: '6일 전 저녁',
-          glucoseSpikeScore: 72,
-          estimatedGlucoseRise: 43,
-          estimatedPeakMinutes: 65,
+          mealBurdenScore: 72,
           calories: 710,
           carbs: 96,
           protein: 24,
           fat: 22,
           sugar: 11,
-          glucoseRisk: GlucoseRisk.high,
-          glucoseDescription:
-              '면 중심 식사라 혈당 스파이크 가능성이 높습니다. 샐러드나 단백질을 먼저 먹으면 피크를 낮추는 데 도움이 됩니다.',
+          mealBurdenLevel: MealBurdenLevel.high,
+          mealBurdenDescription:
+              '면 중심이고 추정 분량이 커 식사 부담이 높게 분류됐습니다. 샐러드나 단백질을 먼저 먹고 면 양을 조절해보세요.',
         ),
       ),
       _sampleRecord(
@@ -241,17 +235,15 @@ class MealHistoryStore extends ChangeNotifier {
         analysis: const MealAnalysis(
           foodName: '카레라이스',
           dateLabel: '7일 전 점심',
-          glucoseSpikeScore: 82,
-          estimatedGlucoseRise: 50,
-          estimatedPeakMinutes: 60,
+          mealBurdenScore: 82,
           calories: 760,
           carbs: 108,
           protein: 22,
           fat: 24,
           sugar: 15,
-          glucoseRisk: GlucoseRisk.high,
-          glucoseDescription:
-              '흰쌀밥과 카레 소스의 탄수화물 비중이 높아 식후 혈당이 크게 오를 수 있어요. 밥 양을 줄이면 부담이 낮아집니다.',
+          mealBurdenLevel: MealBurdenLevel.high,
+          mealBurdenDescription:
+              '흰쌀밥과 카레 소스의 탄수화물 비중과 추정 분량이 커 식사 부담이 높게 분류됐습니다. 밥 양을 줄여보세요.',
         ),
       ),
     ];

@@ -44,7 +44,7 @@ export function createApp({
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>GlucoLog Gemini API 서버</title>
+    <title>LOW42 Gemini API 서버</title>
     <style>
       body {
         margin: 0;
@@ -88,10 +88,10 @@ export function createApp({
   <body>
     <main>
       <span class="badge">Gemini API 서버 정상 실행 중</span>
-      <h1>GlucoLog Gemini API 서버</h1>
+      <h1>LOW42 Gemini API 서버</h1>
       <p>이 주소는 앱 화면이 아니라 Flutter 앱이 호출하는 백엔드 서버입니다.</p>
       <p>상태 확인: <code>/health</code></p>
-      <p>Android Emulator 앱은 기본으로 <code>http://10.0.2.2:${PORT}</code> 를 호출합니다.</p>
+      <p>Flutter 앱은 설정된 HTTPS 백엔드 주소로 이 서버를 호출합니다.</p>
     </main>
   </body>
 </html>`);
@@ -128,7 +128,9 @@ export function createApp({
     }
 
     try {
-      const result = await identifyFoodHandler(req.body);
+      const result = normalizeIdentificationResult(
+        await identifyFoodHandler(req.body),
+      );
       res.json({ ...result, source: 'gemini', ...calibrationContext });
     } catch (error) {
       console.error('Gemini identify fallback:', error);
@@ -156,7 +158,7 @@ export function createApp({
         ...addNoCalibration(
           mockAnalysis(foodName),
           calibrationProfileId
-            ? 'Gemini 응답이 없어 요청한 보정 프로필을 적용하지 않았습니다.'
+            ? 'Gemini 응답이 없어 요청한 제품 가이드를 적용하지 않았습니다.'
             : '',
         ),
         source: 'mock',
@@ -165,7 +167,10 @@ export function createApp({
     }
 
     try {
-      const result = await analyzeMealHandler(req.body);
+      const result = normalizeAnalysis(
+        await analyzeMealHandler(req.body),
+        foodName,
+      );
       const calibratedResult = await resolveCalibration({
         analysis: result,
         foodName,
@@ -179,7 +184,7 @@ export function createApp({
         ...addNoCalibration(
           mockAnalysis(foodName),
           calibrationProfileId
-            ? 'Gemini 처리 실패로 요청한 보정 프로필을 적용하지 않았습니다.'
+            ? 'Gemini 처리 실패로 요청한 제품 가이드를 적용하지 않았습니다.'
             : '',
         ),
         source: 'mock',
@@ -216,7 +221,7 @@ export async function resolveCalibration({
       ? applyCalibration(analysis, profile)
       : addNoCalibration(
           analysis,
-          '요청한 보정 프로필이 없거나 비활성 상태입니다.',
+          '요청한 제품 가이드가 없거나 비활성 상태입니다.',
         );
   }
 
@@ -230,7 +235,7 @@ export function startServer(app = createApp()) {
   return app.listen(PORT, HOST, () => {
     const displayHost = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
     console.log(
-      `GlucoLog Gemini API server listening on http://${displayHost}:${PORT}`,
+      `LOW42 Gemini API server listening on http://${displayHost}:${PORT}`,
     );
     console.log(
       GEMINI_API_KEY
@@ -270,16 +275,18 @@ async function identifyFood(body) {
       '반드시 {"candidates":["음식명"]} JSON 형식만 반환하세요.',
   });
 
-  const candidates = Array.isArray(responseJson.candidates)
-    ? responseJson.candidates
-        .map((candidate) => String(candidate).trim())
+  return normalizeIdentificationResult(responseJson);
+}
+
+export function normalizeIdentificationResult(value) {
+  const candidates = Array.isArray(value?.candidates)
+    ? value.candidates
+        .map((candidate) => sanitizePublicText(candidate, '', 120))
         .filter(Boolean)
         .slice(0, 5)
     : [];
 
-  return {
-    candidates: candidates.length ? candidates : mockCandidates(),
-  };
+  return { candidates: candidates.length ? candidates : mockCandidates() };
 }
 
 async function analyzeMeal(body) {
@@ -309,14 +316,12 @@ async function analyzeMeal(body) {
             required: ['name', 'amount', 'note'],
           },
         },
-        glucoseRisk: {
+        mealBurdenLevel: {
           type: Type.STRING,
           enum: ['low', 'medium', 'high'],
         },
-        glucoseSpikeScore: { type: Type.INTEGER },
-        estimatedGlucoseRise: { type: Type.INTEGER },
-        estimatedPeakMinutes: { type: Type.INTEGER },
-        glucoseDescription: { type: Type.STRING },
+        mealBurdenScore: { type: Type.INTEGER },
+        mealBurdenDescription: { type: Type.STRING },
       },
       required: [
         'foodName',
@@ -327,11 +332,9 @@ async function analyzeMeal(body) {
         'sugar',
         'portionDescription',
         'ingredients',
-        'glucoseRisk',
-        'glucoseSpikeScore',
-        'estimatedGlucoseRise',
-        'estimatedPeakMinutes',
-        'glucoseDescription',
+        'mealBurdenLevel',
+        'mealBurdenScore',
+        'mealBurdenDescription',
       ],
     },
     prompt:
@@ -340,15 +343,20 @@ async function analyzeMeal(body) {
       '사진이 식판/백반/도시락처럼 여러 음식이 함께 있는 한 끼라면 밥, 국, 주반찬, 김치, 샐러드, 소스처럼 보이는 구성품을 각각 나누어 추정하세요. ' +
       '이 경우 foodName은 전체 식사를 설명하는 이름으로 정하고, ingredients에는 단일 재료뿐 아니라 "밥", "국", "김치", "양배추 샐러드" 같은 구성품을 포함하세요. ' +
       '예: 계란 1/2개, 대파 약간, 면 약 180g, 밥 약 2/3공기처럼 사용자가 이해하기 쉬운 한국어 양 표현을 사용하세요. ' +
+      '사진에 숟가락, 젓가락, 포크, 컵, 접시처럼 크기 기준이 될 물체가 보이면 음식과의 상대 비율을 이용해 분량을 추정하세요. ' +
+      '숟가락과 젓가락은 제품마다 실제 크기가 다르므로 절대 측정 도구로 단정하지 말고, 접시 크기와 함께 교차 확인한 뒤 "약" 또는 범위로 표현하세요. ' +
+      '크기 기준 물체가 보이지 않으면 일반적인 접시나 공기 크기를 참고하되 불확실성을 분명히 적으세요. ' +
       '사진에서 양이 명확하지 않으면 "약", "~정도", "추정" 같은 표현을 사용하세요. ' +
-      '계란이 3개인지 1개인지, 면/밥 양이 많은지 적은지, 소스/당류가 많은지 같은 분량 차이를 칼로리와 혈당 상승폭에 반영하세요. ' +
+      '같은 메뉴라도 계란이 3개인지 1개인지, 면/밥 양이 많은지 적은지, 소스/당류가 많은지에 따라 칼로리, 영양 정보와 식사 부담 점수가 달라져야 합니다. 사진마다 임의로 값을 바꾸지 말고 관찰 가능한 분량 차이에 근거하세요. ' +
       'portionDescription에는 전체 음식 양을 한 문장으로 적으세요. ingredients에는 보이는 주요 재료를 3~8개 넣으세요. ' +
       '사진과 음식명을 바탕으로 예상 칼로리와 영양 정보를 한국어 앱에 넣을 JSON으로 추정하세요. ' +
-      '이 결과는 AI 추정값이며 실제 혈당 측정값이 아닙니다. ' +
+      '이 결과는 LOW42 식사 부담 가이드를 위한 AI 참고값이며 개인 혈당 수치나 혈당 상승폭을 산출하지 않습니다. ' +
       '진단, 치료, 투약 결정을 대체하지 않습니다. ' +
-      'estimatedGlucoseRise는 식후 혈당이 얼마나 상승할 수 있는지에 대한 AI 추정 상승폭이며 단위는 mg/dL입니다. 현재 혈당값이나 진단 수치가 아닙니다. ' +
-      'glucoseSpikeScore는 내부 색상 분류용 0~100 영향 점수입니다. glucoseRisk는 estimatedGlucoseRise와 탄수화물/당류를 바탕으로 low, medium, high 중 하나로 정하세요. ' +
-      'glucoseDescription은 한국어 1~2문장으로, 왜 그런 예상 상승폭으로 추정했는지와 식사 팁을 포함하세요. JSON만 반환하세요.',
+      'mealBurdenScore는 추정 분량, 탄수화물과 당류의 양, 단백질·지방·식이섬유의 구성을 함께 고려한 0~100 식사 부담 점수입니다. ' +
+      '양이 많거나 정제 탄수화물·첨가당 비중이 높으면 점수를 높이고, 적정 분량에 단백질과 식이섬유가 균형 있게 포함되면 낮추세요. 지방은 에너지 밀도와 전체 식사 구성을 고려하되 혈당 반응으로 환산하지 마세요. ' +
+      'mealBurdenLevel은 mealBurdenScore가 40 미만이면 low, 40 이상 70 미만이면 medium, 70 이상이면 high로 정하세요. ' +
+      'mealBurdenDescription은 한국어 1~2문장으로, 사진에서 확인한 분량과 영양 구성 때문에 식사 부담을 그렇게 분류한 이유 및 일반적인 식사 팁을 설명하세요. ' +
+      'mg/dL, 예상 혈당, 혈당 상승폭, 개인별 혈당 반응이나 도달 시간을 생성하거나 설명하지 마세요. JSON만 반환하세요.',
   });
 
   return normalizeAnalysis(responseJson, foodName);
@@ -397,48 +405,38 @@ function parseJsonText(text) {
   }
 }
 
-function normalizeAnalysis(json, fallbackFoodName) {
-  const inputRisk = ['low', 'medium', 'high'].includes(json.glucoseRisk)
-    ? json.glucoseRisk
+export function normalizeAnalysis(json, fallbackFoodName) {
+  const inputLevel = ['low', 'medium', 'high'].includes(json.mealBurdenLevel)
+    ? json.mealBurdenLevel
     : 'medium';
   const score = clampInt(
-    json.glucoseSpikeScore,
+    json.mealBurdenScore,
     0,
     100,
-    riskScore(inputRisk),
+    burdenScoreFallback(inputLevel),
   );
-  const estimatedRise = clampInt(
-    json.estimatedGlucoseRise,
-    0,
-    140,
-    riseFromScore(score),
-  );
-  const risk = riskFromRise(estimatedRise);
+  const level = mealBurdenLevelFromScore(score);
 
   return {
-    foodName: String(json.foodName || fallbackFoodName || '알 수 없는 음식'),
+    foodName:
+      sanitizePublicText(fallbackFoodName, '', 100) ||
+      sanitizePublicText(json.foodName, '확인한 음식', 100),
     dateLabel: '오늘 식사',
-    glucoseSpikeScore: score,
-    estimatedGlucoseRise: estimatedRise,
-    estimatedPeakMinutes: clampInt(
-      json.estimatedPeakMinutes,
-      15,
-      180,
-      risk === 'high' ? 60 : risk === 'medium' ? 75 : 90,
-    ),
+    mealBurdenScore: score,
+    mealBurdenLevel: level,
     calories: clampInt(json.calories, 0, 2500, 620),
     carbs: clampInt(json.carbs, 0, 300, 72),
     protein: clampInt(json.protein, 0, 200, 26),
     fat: clampInt(json.fat, 0, 200, 20),
     sugar: clampInt(json.sugar, 0, 200, 12),
-    portionDescription: String(
-      json.portionDescription || '사진 기준 1인분 추정',
+    portionDescription: sanitizePublicText(
+      json.portionDescription,
+      '사진 기준 약 1인분 추정',
+      120,
     ),
     ingredients: normalizeIngredients(json.ingredients),
-    glucoseRisk: risk,
-    glucoseDescription: String(
-      json.glucoseDescription ||
-        '사진과 메뉴명을 바탕으로 한 AI 추정값입니다. 실제 조리법과 섭취량에 따라 식후 혈당 상승폭은 달라질 수 있습니다.',
+    mealBurdenDescription: normalizeMealBurdenDescription(
+      json.mealBurdenDescription,
     ),
   };
 }
@@ -452,9 +450,8 @@ function mockAnalysis(foodName) {
     return {
       foodName,
       dateLabel: '오늘 식사',
-      glucoseSpikeScore: 88,
-      estimatedGlucoseRise: 55,
-      estimatedPeakMinutes: 75,
+      mealBurdenScore: 88,
+      mealBurdenLevel: 'high',
       calories: 780,
       carbs: 82,
       protein: 30,
@@ -465,7 +462,7 @@ function mockAnalysis(foodName) {
         {
           name: '라멘 면',
           amount: '약 180g',
-          note: '혈당 상승의 주 요인',
+          note: '식사 부담의 주 요인',
         },
         {
           name: '차슈',
@@ -483,18 +480,16 @@ function mockAnalysis(foodName) {
           note: '채소류',
         },
       ],
-      glucoseRisk: 'high',
-      glucoseDescription:
-        '면류는 정제 탄수화물 비중이 높아 식후 혈당 상승폭이 크게 추정됩니다. 차슈, 계란, 채소를 먼저 먹고 면 양을 조절하면 부담을 낮추는 데 도움이 됩니다.',
+      mealBurdenDescription:
+        '면류는 정제 탄수화물 비중과 추정 분량이 커 식사 부담이 높게 분류됐습니다. 차슈, 계란, 채소를 먼저 먹고 면 양을 조절해보세요.',
     };
   }
 
   return {
     foodName,
     dateLabel: '오늘 식사',
-    glucoseSpikeScore: 62,
-    estimatedGlucoseRise: 34,
-    estimatedPeakMinutes: 70,
+    mealBurdenScore: 62,
+    mealBurdenLevel: 'medium',
     calories: 620,
     carbs: 72,
     protein: 26,
@@ -510,43 +505,66 @@ function mockAnalysis(foodName) {
       {
         name: '탄수화물/소스',
         amount: '양 추정 필요',
-        note: '혈당 상승폭에 영향',
+        note: '식사 부담에 영향',
       },
     ],
-    glucoseRisk: 'medium',
-    glucoseDescription:
-      '사진과 메뉴명을 바탕으로 식후 혈당 상승폭이 중간 정도로 추정됩니다. 실제 조리법, 양, 소스에 따라 결과는 달라질 수 있습니다.',
+    mealBurdenDescription:
+      '사진과 메뉴명, 추정 분량을 바탕으로 식사 부담이 보통으로 분류됐습니다. 실제 조리법, 양, 소스에 따라 결과는 달라질 수 있습니다.',
   };
 }
 
-function riskFromRise(rise) {
-  if (rise >= 45) return 'high';
-  if (rise >= 25) return 'medium';
+function mealBurdenLevelFromScore(score) {
+  if (score >= 70) return 'high';
+  if (score >= 40) return 'medium';
   return 'low';
 }
 
-function riseFromScore(score) {
-  if (score >= 70) return 55;
-  if (score >= 40) return 34;
-  return 18;
+function normalizeMealBurdenDescription(value) {
+  return sanitizePublicText(
+    value,
+    '사진과 메뉴명, 추정 분량을 바탕으로 만든 식사 부담 가이드입니다. 실제 조리법과 섭취량에 따라 결과는 달라질 수 있습니다.',
+    360,
+  );
 }
 
 function normalizeIngredients(value) {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((item) => ({
-      name: String(item?.name || '').trim(),
-      amount: String(item?.amount || '').trim(),
-      note: String(item?.note || '').trim(),
-    }))
+    .map((item) => {
+      const name = sanitizePublicText(item?.name, '', 80);
+      const amount = sanitizePublicText(item?.amount, '', 80);
+      if (!name || !amount) return null;
+      return {
+        name,
+        amount,
+        note: normalizeIngredientNote(item?.note),
+      };
+    })
+    .filter(Boolean)
     .filter((item) => item.name && item.amount)
     .slice(0, 8);
 }
 
-function riskScore(risk) {
-  if (risk === 'high') return 88;
-  if (risk === 'low') return 30;
+function normalizeIngredientNote(value) {
+  return sanitizePublicText(value, '식사 구성 참고', 100);
+}
+
+function sanitizePublicText(value, fallback, maxLength) {
+  const text = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!text || containsForbiddenPublicCopy(text)) return fallback;
+  return text.slice(0, maxLength);
+}
+
+function containsForbiddenPublicCopy(value) {
+  return /mg\s*\/\s*dL|혈당|당뇨|스파이크|피크|진단|치료|투약|인슐린|질병\s*(?:예방|개선|완화)/i.test(
+    value,
+  );
+}
+
+function burdenScoreFallback(level) {
+  if (level === 'high') return 88;
+  if (level === 'low') return 30;
   return 62;
 }
 

@@ -29,7 +29,7 @@ class ResultScreen extends StatelessWidget {
           children: [
             Text('분석 결과'),
             Text(
-              'AI 식사 인사이트',
+              'LOW42 식사 부담 가이드',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 10,
@@ -79,7 +79,7 @@ class ResultScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                RiskPill(risk: analysis.glucoseRisk),
+                RiskPill(level: analysis.mealBurdenLevel),
               ],
             ),
             if (analysis.ingredients.isNotEmpty) ...[
@@ -153,12 +153,12 @@ class ResultScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'AI 분석 결과 안내',
+              '식사 부담 가이드 안내',
               style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
             ),
             SizedBox(height: 10),
             Text(
-              '사진과 메뉴명을 바탕으로 일반적인 조리법과 1인분을 가정해 계산한 추정값입니다. 정확한 섭취량, 조리법, 개인의 건강 상태에 따라 실제 결과는 달라집니다.',
+              '사진 속 음식과 메뉴명, 숟가락·젓가락·접시의 상대적 크기를 참고해 분량과 영양 정보를 추정합니다. 식기 실제 크기, 촬영 각도, 조리법에 따라 결과는 달라질 수 있습니다.',
               style: TextStyle(
                 color: AppColors.muted,
                 height: 1.55,
@@ -251,7 +251,7 @@ class _PredictionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '예상 식후 혈당 상승폭',
+            '식사 부담 가이드',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 12,
@@ -263,7 +263,7 @@ class _PredictionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '+${analysis.estimatedGlucoseRise}',
+                analysis.mealBurdenLevel.label,
                 style: const TextStyle(
                   color: AppColors.ink,
                   fontSize: 36,
@@ -271,24 +271,13 @@ class _PredictionCard extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 7, left: 5),
-                child: Text(
-                  'mg/dL',
-                  style: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
               const Spacer(),
-              RiskPill(risk: analysis.glucoseRisk),
+              RiskPill(level: analysis.mealBurdenLevel),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            '예상 피크 ${analysis.estimatedPeakMinutes}분 · 부담 점수 ${analysis.glucoseSpikeScore}/100',
+            '분량·영양 구성 참고 점수 ${analysis.mealBurdenScore}/100 · ${analysis.portionDescription}',
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 11,
@@ -296,10 +285,10 @@ class _PredictionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _RiskGauge(score: analysis.glucoseSpikeScore),
+          _RiskGauge(score: analysis.mealBurdenScore),
           const SizedBox(height: 13),
           Text(
-            analysis.glucoseDescription,
+            analysis.mealBurdenDescription,
             style: const TextStyle(
               color: AppColors.ink,
               fontSize: 12,
@@ -347,7 +336,7 @@ class _CalibrationCard extends StatelessWidget {
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
-                  '측정 데이터 보정 적용',
+                  '제품·메뉴 데이터 반영',
                   style: TextStyle(
                     color: AppColors.primaryDark,
                     fontSize: 14,
@@ -362,7 +351,7 @@ class _CalibrationCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
-                  '데이터 보정',
+                  '가이드 보정',
                   style: TextStyle(
                     color: AppColors.primaryDark,
                     fontSize: 9,
@@ -389,40 +378,20 @@ class _CalibrationCard extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: 'AI 원본 '),
-                  TextSpan(
-                    text: '+${calibration.rawEstimatedGlucoseRise}',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const TextSpan(text: '  →  보정 '),
-                  TextSpan(
-                    text: '+${calibration.adjustedEstimatedGlucoseRise}',
-                    style: const TextStyle(
-                      color: AppColors.primaryDark,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const TextSpan(text: ' mg/dL'),
-                ],
-              ),
+            child: Text(
+              'AI 기본 ${_guideLabelFromScore(calibration.rawMealBurdenScore)}  →  '
+              '제품 반영 ${_guideLabelFromScore(calibration.adjustedMealBurdenScore)}',
               style: const TextStyle(
                 color: AppColors.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
           if (calibration.sampleCount > 0) ...[
             const SizedBox(height: 9),
             Text(
-              '등록된 실측 표본 ${calibration.sampleCount}건을 참고했습니다.',
+              '등록 제품 정보 ${calibration.sampleCount}건을 참고했습니다.',
               style: const TextStyle(
                 color: AppColors.primaryDark,
                 fontSize: 10,
@@ -599,7 +568,7 @@ class _NutritionCard extends StatelessWidget {
           Row(
             children: [
               const Text(
-                '영양 정보',
+                '추정 영양 정보',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
               ),
               const Spacer(),
@@ -711,10 +680,11 @@ class _CoachingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tip = switch (analysis.glucoseRisk) {
-      GlucoseRisk.low => '좋은 선택이에요. 지금의 식사 구성을 유지하고 천천히 먹어보세요.',
-      GlucoseRisk.medium => '채소와 단백질을 먼저 먹고 탄수화물은 뒤에 먹으면 부담을 낮추는 데 도움이 됩니다.',
-      GlucoseRisk.high => '양을 조금 줄이고 식후 10~15분 가볍게 걸어 혈당 부담을 낮춰보세요.',
+    final tip = switch (analysis.mealBurdenLevel) {
+      MealBurdenLevel.low => '좋은 선택이에요. 지금의 식사 구성을 유지하고 천천히 먹어보세요.',
+      MealBurdenLevel.medium =>
+        '채소와 단백질을 먼저 먹고 탄수화물은 뒤에 먹으면 부담을 낮추는 데 도움이 됩니다.',
+      MealBurdenLevel.high => '양을 조금 줄이고 식후 10~15분 가볍게 걸어 식사 부담을 낮춰보세요.',
     };
     return AppCard(
       color: AppColors.surfaceWarm,
@@ -735,7 +705,7 @@ class _CoachingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'AI 맞춤 팁',
+                  '일반 식사 팁',
                   style: TextStyle(
                     color: AppColors.primaryDark,
                     fontSize: 13,
@@ -769,7 +739,7 @@ class _MedicalNotice extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 5),
       child: Text(
-        '이 결과는 실제 혈당 측정값이 아닌 AI 추정치입니다. 의료 진단·투약 판단에 사용하지 마세요.',
+        '이 결과는 사진 기반 식사 부담 가이드이며 실제 혈당 측정값이 아닙니다. 의료 진단·투약 판단에 사용하지 마세요.',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: AppColors.muted,
@@ -780,4 +750,10 @@ class _MedicalNotice extends StatelessWidget {
       ),
     );
   }
+}
+
+String _guideLabelFromScore(int score) {
+  if (score >= 70) return '높음';
+  if (score >= 40) return '보통';
+  return '낮음';
 }

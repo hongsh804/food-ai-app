@@ -95,7 +95,10 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
         imageBytes: widget.imageBytes,
         calibrationProfileId: widget.calibrationProfileId,
       );
-      final record = await MealHistoryStore.instance.addAnalysis(analysis);
+      final record = await MealHistoryStore.instance.addAnalysis(
+        analysis,
+        previewImageBytes: widget.imageBytes,
+      );
       if (!mounted) return;
       setState(() => _completedSteps = 3);
       await Future<void>.delayed(const Duration(milliseconds: 280));
@@ -245,7 +248,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
                         Text(
                           _isIdentifying
                               ? '사진 속 메뉴 후보를 정리하고 있습니다.'
-                              : '${widget.confirmedFoodName ?? '선택한 음식'}의 식후 혈당 부담을 예측합니다.',
+                              : '${widget.confirmedFoodName ?? '선택한 음식'}의 식사 부담 가이드를 만들고 있습니다.',
                           style: const TextStyle(
                             color: AppColors.muted,
                             fontSize: 12,
@@ -273,10 +276,10 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
                         _AnalysisStep(
                           index: 3,
                           completedSteps: _completedSteps,
-                          label: _isIdentifying ? '확인 화면 준비' : '식후 혈당 부담 예측',
+                          label: _isIdentifying ? '확인 화면 준비' : '식사 부담 가이드 생성',
                           detail: _isIdentifying
                               ? '정확한 메뉴 확인 필요'
-                              : '예상 상승폭과 코칭 생성',
+                              : '음식 양·영양 정보와 코칭 생성',
                         ),
                       ],
                     ],

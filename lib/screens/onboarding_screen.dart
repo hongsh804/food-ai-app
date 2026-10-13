@@ -31,7 +31,7 @@ class OnboardingScreen extends StatelessWidget {
                       const _BrandTitle(),
                       const SizedBox(height: 10),
                       const Text(
-                        '사진 한 장으로 식후 혈당 부담을 예측하고\n나에게 맞는 식사 습관을 만들어보세요.',
+                        '사진 한 장으로 음식의 구성과 양을 살펴보고\n식사 부담 가이드를 확인해보세요.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.muted,
@@ -50,7 +50,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'AI 예측값은 건강관리 참고용이며\n의료 진단이나 실제 혈당 측정을 대신하지 않습니다.',
+                        'AI 식사 부담 가이드는 일반 참고 정보이며\n의료 진단이나 실제 혈당 측정을 대신하지 않습니다.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.muted,
@@ -81,9 +81,9 @@ class _BrandTitle extends StatelessWidget {
         Text.rich(
           TextSpan(
             children: [
-              TextSpan(text: 'Gluco'),
+              TextSpan(text: 'LOW'),
               TextSpan(
-                text: 'Log',
+                text: '42',
                 style: TextStyle(color: AppColors.primary),
               ),
             ],
@@ -97,7 +97,7 @@ class _BrandTitle extends StatelessWidget {
         ),
         SizedBox(height: 3),
         Text(
-          '글루로그',
+          '로우포티투',
           style: TextStyle(
             color: AppColors.primaryDark,
             fontSize: 11,
@@ -118,11 +118,11 @@ class _FeatureRow extends StatelessWidget {
     return const Row(
       children: [
         Expanded(
-          child: _Feature(icon: Icons.camera_alt_rounded, text: '사진 분석'),
+          child: _Feature(icon: Icons.camera_alt_rounded, text: '사진·양 분석'),
         ),
         SizedBox(width: 10),
         Expanded(
-          child: _Feature(icon: Icons.water_drop_rounded, text: '상승폭 예측'),
+          child: _Feature(icon: Icons.restaurant_rounded, text: '식사 부담 가이드'),
         ),
         SizedBox(width: 10),
         Expanded(
